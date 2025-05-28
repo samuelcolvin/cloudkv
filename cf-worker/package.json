@@ -1,0 +1,34 @@
+{
+  "name": "cloudkv",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "format": "prettier --write -- .",
+    "lint": "prettier --check -- .",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "cf-typegen": "wrangler types"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": false,
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "printWidth": 119,
+    "bracketSpacing": true
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.19",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.5.2",
+    "vitest": "~3.0.7",
+    "wrangler": "^4.17.0"
+  },
+  "dependencies": {
+    "mime": "^4.0.7",
+    "uuid": "^11.1.0"
+  }
+}

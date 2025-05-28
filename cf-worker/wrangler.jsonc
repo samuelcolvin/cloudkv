@@ -1,0 +1,12 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "cloudkv",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-05-28",
+	"kv_namespaces": [
+		{
+			"binding": "cloudkv_data",
+			"id": "8090651072a44fee9fc9d4edcc903feb",
+		},
+	],
+}
