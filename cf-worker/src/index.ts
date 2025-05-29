@@ -19,21 +19,21 @@ export default {
     const match = path.match(/^\/([a-f0-9-]{36})\/?(.*)$/)
     if (match) {
       const [_, namespace, key] = match
-      if (request.method === 'GET' || request.method === 'HEAD') {
+      if (key === '') {
+        return await list(namespace, request, env)
+      } else if (request.method === 'GET' || request.method === 'HEAD') {
         return await get(namespace, key, request, env)
       } else if (request.method === 'POST') {
         return await set(namespace, key, request, env)
-      } else if (request.method === 'OPTIONS') {
-        return await list(namespace, key, request, env)
       } else {
-        return response405('GET', 'HEAD', 'POST', 'OPTIONS')
+        return response405('GET', 'HEAD', 'POST')
       }
     } else if (path === '/create') {
       return await create(request, env)
     } else if (path === '') {
       return index(request)
     } else {
-      return response404('Not found')
+      return textResponse('Not found', 404)
     }
   },
 } satisfies ExportedHandler<Env>
@@ -43,157 +43,197 @@ async function get(namespace: string, key: string, request: Request, env: Env): 
   if (!value || !metadata) {
     // only check the namespace if the key does not exist
     const row = await env.DB.prepare('select 1 from namespaces where id=?').bind(namespace).first()
-    if (row) {
-      return response404('Key does not exist')
-    } else {
-      return response404('Namespace does not exist')
-    }
+    return textResponse(row ? 'Key does not exist' : 'Namespace does not exist', 404)
   }
-  const { contentType, createdAt, ttl, expiration } = metadata
   return new Response(request.method === 'HEAD' ? '' : value, {
-    headers: {
-      'Content-Type': contentType || 'application/octet-stream',
-      'X-CloudKV-Created-At': createdAt,
-      'X-CloudKV-TTL': ttl.toString(),
-      'X-CloudKV-Expiration': expiration,
-    },
+    headers: { 'Content-Type': metadata.content_type || 'application/octet-stream' },
   })
 }
 
 async function set(namespace: string, key: string, request: Request, env: Env): Promise<Response> {
-  let contentType = request.headers.get('Content-Type')
-  if (!contentType) {
-    contentType = mime.getType(key)
+  let content_type = request.headers.get('Content-Type')
+  if (!content_type) {
+    content_type = mime.getType(key)
   }
 
   const ttl_header = request.headers.get('x-cloudkv-ttl')
   let ttl: number
   try {
-    ttl = parseFloat(ttl_header || '31536000')
+    ttl = parseInt(ttl_header || '31536000')
   } catch (error) {
-    return response400(`Invalid "X-CloudKV-TTL" header "${ttl_header}": not a valid number`)
+    return textResponse(`Invalid "X-CloudKV-TTL" header "${ttl_header}": not a valid number`, 400)
   }
   if (ttl < 60 || ttl > 31536000) {
-    return response400(`Invalid "X-CloudKV-TTL" header "${ttl_header}": must be >60 and <=31536000 seconds`)
+    return textResponse(`Invalid "X-CloudKV-TTL" header "${ttl_header}": must be >60 and <=31536000 seconds`, 400)
   }
 
   const body = await request.arrayBuffer()
   const size = body.byteLength
   if (!size) {
-    return response400('To set a key, the request body must not be empty')
+    return textResponse('To set a key, the request body must not be empty', 400)
   }
   if (size > MAX_VALUE_SIZE) {
-    return response400('To set a key, the key size must not exceed 25MB')
+    return textResponse('To set a key, the key size must not exceed 25MB', 400)
   }
 
-  const row: { size: number } | null = await env.DB.prepare('select size from namespaces where id=?')
-    .bind(namespace)
-    .first()
-  if (!row) {
-    return response404('Namespace not found')
-  } else if (row.size + size > MAX_NAMESPACE_SIZE) {
-    return response400('Namespace size limit of 100MB would be exceeded')
+  let { nsExists, nsSize } = (await env.DB.prepare(
+    `
+select
+  exists (select 1 from namespaces where id = ?) as nsExists,
+  (
+    select coalesce(sum(size), 0)
+    from kv
+    where namespace_id = ? and key != ? and expiration > datetime('now')
+  ) as nsSize;
+`,
+  )
+    .bind(namespace, namespace, key)
+    .first<{ nsExists: number; nsSize: number }>())!
+
+  if (!nsExists) {
+    return textResponse('Namespace does not exist', 404)
+  } else if (nsSize + size > MAX_NAMESPACE_SIZE) {
+    return textResponse('Namespace size limit of 100MB would be exceeded', 400)
   }
 
-  const createdAtRaw = new Date()
-  const createdAt = createdAtRaw.toISOString()
-  const expirationRaw = new Date(createdAtRaw.getTime() + ttl * 1000)
-  const expiration = expirationRaw.toISOString()
-  const metadata: KVMetadata = { contentType, size, createdAt, ttl, expiration }
+  const { created_at, expiration } = (await env.DB.prepare(
+    `
+insert into kv
+  (namespace_id, key, content_type, size, expiration)
+values (?, ?, ?, ?, datetime('now', ?))
+on conflict do update set
+  content_type = excluded.content_type,
+  size = excluded.size,
+  created_at = datetime('now'),
+  expiration = excluded.expiration
+returning
+  ${sqlIsoDate('created_at')} as created_at,
+  ${sqlIsoDate('expiration')} as expiration
+`,
+  )
+    .bind(namespace, key, content_type, size, `+${ttl} seconds`)
+    .first<{ created_at: string; expiration: string }>())!
+
+  await env.DB.prepare("delete from kv where namespace_id = ? and expiration < datetime('now')").bind(namespace).run()
+
+  const metadata: KVMetadata = { content_type }
+  const expirationDate = new Date(expiration)
   await env.cloudkvData.put(dataKey(namespace, key), body, {
-    expiration: expirationRaw.getTime() / 1000,
+    expiration: expirationDate.getTime() / 1000,
     metadata,
   })
-  await env.DB.prepare('update namespaces set size=size+? where id=?').bind(size, namespace).run()
   return jsonResponse({
     url: request.url,
-    metadata,
+    content_type: content_type,
+    created_at,
+    expiration,
   })
 }
 
 interface KVMetadata {
-  contentType: string | null
-  size: number
-  createdAt: string
-  expiration: string
-  ttl: number
+  content_type: string | null
 }
 
-interface ListKey {
+interface DbRow {
+  key: string
+  content_type: string
+  size: number
+  created_at: string
+  expiration: string
+}
+
+interface ListKey extends DbRow {
   url: string
-  metadata?: KVMetadata
 }
 
 interface ListResponse {
-  namespace: string
-  namespace_created_at: string
-  namespace_size: number
-  keys_size: number
   keys: ListKey[]
 }
 
-async function list(namespace: string, prefix: string, request: Request, env: Env): Promise<Response> {
-  const row: { namespace_created_at: string; namespace_size: number } | null = await env.DB.prepare(
+async function list(namespace: string, request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'GET') {
+    return response405('GET')
+  }
+
+  const nsExists = await env.DB.prepare('select 1 from namespaces where id=?').bind(namespace).first()
+  if (!nsExists) {
+    return textResponse('Namespace does not exist', 404)
+  }
+
+  const url = new URL(request.url)
+  const like = url.searchParams.get('like')
+  let offset = 0
+  let offsetParam = url.searchParams.get('offset')
+  if (offsetParam) {
+    try {
+      offset = parseInt(offsetParam)
+    } catch (error) {
+      return textResponse('Invalid offset', 400)
+    }
+  }
+  // clean the URL to use when building the key URL
+  url.pathname = `/${namespace}`
+  url.search = ''
+  url.hash = ''
+
+  const params = like ? [namespace, like, offset] : [namespace, offset]
+  const result = await env.DB.prepare(
     `
 select
-  strftime('%Y-%m-%dT%H:%M:%fZ', ts) as namespace_created_at,
-  size as namespace_size
-from namespaces where id=?`,
+  key,
+  content_type,
+  size,
+  ${sqlIsoDate('created_at')} as created_at,
+  ${sqlIsoDate('expiration')} as expiration
+from kv
+where namespace_id = ? and expiration > datetime('now') ${like ? `and key like ?` : ''}
+order by created_at
+limit 1000
+offset ?
+`,
   )
-    .bind(namespace)
-    .first()
-  if (!row) {
-    return response404('Namespace does not exist')
-  }
-  const { namespace_created_at, namespace_size } = row
-  const list = await env.cloudkvData.list<KVMetadata>({ prefix: dataKey(namespace, prefix) })
-  console.log(list)
-  const url = new URL(request.url)
-  url.pathname = `/${namespace}`
-  const keys_size = list.keys.reduce((acc, { metadata }) => acc + (metadata ? metadata.size : 0), 0)
-  const response: ListResponse = {
-    namespace,
-    namespace_created_at,
-    namespace_size,
-    keys_size,
-    keys: list.keys.map(({ name, metadata }) => ({ url: `${url}/${name.split(':')[2]}`, metadata })),
-  }
+    .bind(...params)
+    .all<DbRow>()
+  console.log(result)
+  const keys = result.results.map((row) => ({
+    url: `${url}/${row.key}`,
+    ...row,
+  })) as ListKey[]
+
+  const response: ListResponse = { keys }
   return jsonResponse(response)
 }
 
 async function create(request: Request, env: Env): Promise<Response> {
-  if (request.method === 'POST') {
+  if (request.method !== 'POST') {
     return response405('POST')
   }
   const ip = getIP(request)
-  let { global_count, ip_count } = (await env.DB.prepare(
+  let { globalCount, ipCount } = (await env.DB.prepare(
     `
-with global_count as (
-  select count(*) as count from namespaces where ts > DATETIME('now', '-24 hours')
-),
-ip_count as (
-  select count(*) as count from namespaces where ts > DATETIME('now', '-24 hours') and ip = ?
-)
-select global_count.count as global_count, ip_count.count as ip_count
-from global_count, ip_count
-`,
+select
+  count(*) as globalCount,
+  count(case when ip = ? then 1 end) as ipCount
+from namespaces
+where created_at > datetime('now', '-24 hours')
+  `,
   )
     .bind(ip)
-    .first()) as { global_count: number; ip_count: number }
+    .first<{ globalCount: number; ipCount: number }>())!
 
-  console.log('namespace creation', { global_count, ip_count, ip })
-  if (global_count > MAX_GLOBAL_24) {
-    return response429(`Global limit (${MAX_GLOBAL_24}) on namespace creation per 24 hours exceeded`)
-  } else if (ip_count > MAX_IP_24) {
-    return response429(`IP limit (${MAX_IP_24}) on namespace creation per 24 hours exceeded`)
+  console.log('namespace creation', { globalCount, ipCount, ip })
+  if (globalCount > MAX_GLOBAL_24) {
+    return textResponse(`Global limit (${MAX_GLOBAL_24}) on namespace creation per 24 hours exceeded`, 429)
+  } else if (ipCount > MAX_IP_24) {
+    return textResponse(`IP limit (${MAX_IP_24}) on namespace creation per 24 hours exceeded`, 429)
   }
 
   let namespace = uuidv4()
   let { created_at } = (await env.DB.prepare(
-    `insert into namespaces (id, ip) values (?, ?) returning strftime('%Y-%m-%dT%H:%M:%fZ', ts) as created_at`,
+    `insert into namespaces (id, ip) values (?, ?) returning ${sqlIsoDate('created_at')} as created_at`,
   )
     .bind(namespace, ip)
-    .first()) as { created_at: string }
+    .first<{ created_at: string }>())!
   return jsonResponse({ namespace, created_at })
 }
 
@@ -212,6 +252,12 @@ function index(request: Request): Response {
 const dataKey = (namespace: string, key: string) => `data:${namespace}:${key}`
 
 const ctHeader = (contentType: string) => ({ 'Content-Type': contentType })
+
+const textResponse = (message: string, status: number) =>
+  new Response(message, { status, headers: ctHeader('text/plain') })
+const jsonResponse = (data: any) =>
+  new Response(JSON.stringify(data, null, 2) + '\n', { headers: ctHeader('application/json') })
+
 const response405 = (...allowMethods: string[]) => {
   const allow = allowMethods.join(', ')
   return new Response(`Method not allowed, Allowed: ${allow}`, {
@@ -219,11 +265,6 @@ const response405 = (...allowMethods: string[]) => {
     headers: { allow, ...ctHeader('text/plain') },
   })
 }
-const response404 = (message: string) => new Response(message, { status: 404, headers: ctHeader('text/plain') })
-const response400 = (message: string) => new Response(message, { status: 400, headers: ctHeader('text/plain') })
-const response429 = (message: string) => new Response(message, { status: 429, headers: ctHeader('text/plain') })
-const jsonResponse = (data: any) =>
-  new Response(JSON.stringify(data, null, 2) + '\n', { headers: ctHeader('application/json') })
 
 const getIP = (request: Request): string => {
   const ip = request.headers.get('cf-connecting-ip')
@@ -233,3 +274,4 @@ const getIP = (request: Request): string => {
     throw new Error('IP address not found')
   }
 }
+const sqlIsoDate = (field: string) => `strftime('%Y-%m-%dT%H:%M:%SZ', ${field})`

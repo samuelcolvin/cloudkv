@@ -1,10 +1,25 @@
+-- DROP TABLE IF EXISTS namespaces;
+-- DROP TABLE IF EXISTS kv;
 CREATE TABLE IF NOT EXISTS namespaces (
-  id UUID PRIMARY KEY,
-  ip TEXT,
-  size INTEGER DEFAULT 0,
-  ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id TEXT NOT NULL PRIMARY KEY,
+  ip TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_ip ON namespaces (ip);
+CREATE INDEX IF NOT EXISTS idx_namespaces_ip ON namespaces (ip);
 
-CREATE INDEX IF NOT EXISTS idx_ts ON namespaces (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_namespaces_created_at ON namespaces (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS kv (
+  namespace_id TEXT NOT NULL REFERENCES namespaces (id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expiration TIMESTAMP NOT NULL,
+  UNIQUE (namespace_id, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kv_namespace_id ON kv (namespace_id);
+
+CREATE INDEX IF NOT EXISTS idx_kv_expiration ON kv (expiration DESC);

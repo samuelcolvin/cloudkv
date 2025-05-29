@@ -23,6 +23,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.19",
     "@types/uuid": "^10.0.0",
+    "prettier": "^3.5.3",
     "typescript": "^5.5.2",
     "vitest": "~3.0.7",
     "wrangler": "^4.17.0"
