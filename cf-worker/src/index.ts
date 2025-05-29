@@ -1,14 +1,22 @@
 import { v4 as uuidv4 } from 'uuid'
 import mime from 'mime'
 
+const MB = 1024 * 1024
 // maximum number of namespaces that can be created in 24 hours, across all IPs
 const MAX_GLOBAL_24 = 1000
 // maximum number of namespaces that can be created in 24 hours, per IP
 const MAX_IP_24 = 20
-// maximum size of a namespace in bytes
-const MAX_NAMESPACE_SIZE = 1024 * 1024 * 100
+// maximum size of a namespace
+const MAX_NAMESPACE_SIZE_MB = 200
+const MAX_NAMESPACE_SIZE = MAX_NAMESPACE_SIZE_MB * MB
 // maximum size of a value in bytes, this is a limitation of cloudflare KV
-const MAX_VALUE_SIZE = 1024 * 1024 * 25
+const MAX_VALUE_SIZE_MB = 25
+const MAX_VALUE_SIZE = MAX_VALUE_SIZE_MB * MB
+// minimum TTL for key is 1 minute, cloudflare limitation
+const MIN_TTL = 60
+// max TTL for key is 10 years
+const MAX_TTL = 60 * 60 * 24 * 365 * 10
+const MAX_KEY_SIZE = 2048
 
 export default {
   async fetch(request, env): Promise<Response> {
@@ -52,19 +60,25 @@ async function get(namespace: string, key: string, request: Request, env: Env): 
 
 async function set(namespace: string, key: string, request: Request, env: Env): Promise<Response> {
   let content_type = request.headers.get('Content-Type')
-  if (!content_type) {
+  if (content_type) {
+    content_type = content_type.split(';')[0]
+  } else {
     content_type = mime.getType(key)
   }
-
-  const ttl_header = request.headers.get('x-cloudkv-ttl')
-  let ttl: number
-  try {
-    ttl = parseInt(ttl_header || '31536000')
-  } catch (error) {
-    return textResponse(`Invalid "X-CloudKV-TTL" header "${ttl_header}": not a valid number`, 400)
+  if (key.length > MAX_KEY_SIZE) {
+    return textResponse(`Key length must not exceed ${MAX_KEY_SIZE}`, 400)
   }
-  if (ttl < 60 || ttl > 31536000) {
-    return textResponse(`Invalid "X-CloudKV-TTL" header "${ttl_header}": must be >60 and <=31536000 seconds`, 400)
+
+  let ttl: number = MAX_TTL
+  const ttlHeader = request.headers.get('ttl')
+  if (ttlHeader) {
+    try {
+      ttl = parseInt(ttlHeader)
+    } catch (error) {
+      return textResponse(`Invalid "TTL" header "${ttlHeader}": not a valid number`, 400)
+    }
+    // clamp ttl to valid range
+    ttl = Math.max(MIN_TTL, Math.min(ttl, MAX_TTL))
   }
 
   const body = await request.arrayBuffer()
@@ -73,7 +87,7 @@ async function set(namespace: string, key: string, request: Request, env: Env): 
     return textResponse('To set a key, the request body must not be empty', 400)
   }
   if (size > MAX_VALUE_SIZE) {
-    return textResponse('To set a key, the key size must not exceed 25MB', 400)
+    return textResponse(`Value size must not exceed ${MAX_VALUE_SIZE_MB}MB`, 400)
   }
 
   let { nsExists, nsSize } = (await env.DB.prepare(
@@ -93,7 +107,7 @@ select
   if (!nsExists) {
     return textResponse('Namespace does not exist', 404)
   } else if (nsSize + size > MAX_NAMESPACE_SIZE) {
-    return textResponse('Namespace size limit of 100MB would be exceeded', 400)
+    return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 400)
   }
 
   const { created_at, expiration } = (await env.DB.prepare(
@@ -122,9 +136,14 @@ returning
     expiration: expirationDate.getTime() / 1000,
     metadata,
   })
+  const url = new URL(request.url)
+  url.search = ''
+  url.hash = ''
   return jsonResponse({
-    url: request.url,
+    url,
+    key,
     content_type: content_type,
+    size,
     created_at,
     expiration,
   })
