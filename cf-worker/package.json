@@ -5,7 +5,7 @@
   "scripts": {
     "format": "prettier --write -- .",
     "lint": "prettier --check -- .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit &&cd test && tsc --noEmit",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
@@ -22,14 +22,9 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.19",
-    "@types/uuid": "^10.0.0",
     "prettier": "^3.5.3",
     "typescript": "^5.5.2",
     "vitest": "~3.0.7",
     "wrangler": "^4.17.0"
-  },
-  "dependencies": {
-    "mime": "^4.0.7",
-    "uuid": "^11.1.0"
   }
 }

@@ -1,6 +1,3 @@
-import { v4 as uuidv4 } from 'uuid'
-import mime from 'mime'
-
 const MB = 1024 * 1024
 // maximum number of namespaces that can be created in 24 hours, across all IPs
 const MAX_GLOBAL_24 = 1000
@@ -19,12 +16,12 @@ const MAX_TTL = 60 * 60 * 24 * 365 * 10
 const MAX_KEY_SIZE = 2048
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, _ctx): Promise<Response> {
     let path = new URL(request.url).pathname
     if (path.endsWith('/')) {
       path = path.slice(0, -1)
     }
-    const match = path.match(/^\/([a-f0-9-]{36})\/?(.*)$/)
+    const match = path.match(/^\/([a-zA-Z0-9]{48})\/?(.*)$/)
     if (match) {
       const [_, namespace, key] = match
       if (key === '') {
@@ -41,7 +38,7 @@ export default {
     } else if (path === '') {
       return index(request)
     } else {
-      return textResponse('Not found', 404)
+      return textResponse('Path not found', 404)
     }
   },
 } satisfies ExportedHandler<Env>
@@ -62,8 +59,6 @@ async function set(namespace: string, key: string, request: Request, env: Env): 
   let content_type = request.headers.get('Content-Type')
   if (content_type) {
     content_type = content_type.split(';')[0]
-  } else {
-    content_type = mime.getType(key)
   }
   if (key.length > MAX_KEY_SIZE) {
     return textResponse(`Key length must not exceed ${MAX_KEY_SIZE}`, 400)
@@ -213,7 +208,6 @@ offset ?
   )
     .bind(...params)
     .all<DbRow>()
-  console.log(result)
   const keys = result.results.map((row) => ({
     url: `${url}/${row.key}`,
     ...row,
@@ -240,14 +234,13 @@ where created_at > datetime('now', '-24 hours')
     .bind(ip)
     .first<{ globalCount: number; ipCount: number }>())!
 
-  console.log('namespace creation', { globalCount, ipCount, ip })
   if (globalCount > MAX_GLOBAL_24) {
     return textResponse(`Global limit (${MAX_GLOBAL_24}) on namespace creation per 24 hours exceeded`, 429)
   } else if (ipCount > MAX_IP_24) {
     return textResponse(`IP limit (${MAX_IP_24}) on namespace creation per 24 hours exceeded`, 429)
   }
 
-  let namespace = uuidv4()
+  let namespace = uniqueId()
   let { created_at } = (await env.DB.prepare(
     `insert into namespaces (id, ip) values (?, ?) returning ${sqlIsoDate('created_at')} as created_at`,
   )
@@ -258,7 +251,7 @@ where created_at > datetime('now', '-24 hours')
 
 function index(request: Request): Response {
   if (request.method === 'GET') {
-    return new Response('<h1>Cloud KV</h1><p>See <a href="#">pydantic/cloudkv</a> for details.</p>', {
+    return new Response('<h1>Cloud KV</h1><p>See <a href="#">samuelcolvin/cloudkv</a> for details.</p>', {
       headers: ctHeader('text/html'),
     })
   } else if (request.method === 'HEAD') {
@@ -294,3 +287,14 @@ const getIP = (request: Request): string => {
   }
 }
 const sqlIsoDate = (field: string) => `strftime('%Y-%m-%dT%H:%M:%SZ', ${field})`
+
+// this will always generate an alphanumeric string of 48 characters
+function uniqueId(): string {
+  const uint8Array = new Uint8Array(36)
+  crypto.getRandomValues(uint8Array)
+  // Convert Uint8Array to binary string
+  const binaryString = String.fromCharCode.apply(null, Array.from(uint8Array))
+  // Encode to base64, and replace `/` with 'a' and `+` with 'b' and `=` with 'c'
+  // (this reduces entropy very slightly but makes the search easier to use)
+  return btoa(binaryString).replaceAll('/', 'a').replaceAll('+', 'b').replaceAll('=', 'c')
+}
