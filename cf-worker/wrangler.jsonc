@@ -6,14 +6,14 @@
   "kv_namespaces": [
     {
       "binding": "cloudkvData",
-      "id": "8090651072a44fee9fc9d4edcc903feb",
+      "id": "65c0dc619af8484da481c31e080b528f",
     },
   ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "cloudkv-limits",
-      "database_id": "58dbbb9c-beae-4827-b5c0-7a50d0261c36",
+      "database_id": "d5053851-d744-4295-b41d-2f13ba1e8e3b",
     },
   ],
 }

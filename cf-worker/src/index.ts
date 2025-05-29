@@ -51,7 +51,7 @@ async function get(namespace: string, key: string, request: Request, env: Env): 
     return textResponse(row ? 'Key does not exist' : 'Namespace does not exist', 404)
   }
   return new Response(request.method === 'HEAD' ? '' : value, {
-    headers: { 'Content-Type': metadata.content_type || 'application/octet-stream' },
+    headers: metadata.content_type ? { 'Content-Type': metadata.content_type } : {},
   })
 }
 

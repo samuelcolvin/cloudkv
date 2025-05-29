@@ -20,7 +20,7 @@ interface SetKV {
 interface ListKey {
   url: string
   key: string
-  content_type: string
+  content_type: string | null
   size: number
   created_at: string
   expiration: string
@@ -67,6 +67,35 @@ DROP TABLE IF EXISTS kv;
     expect(Object.keys(data)).toEqual(['namespace', 'created_at'])
     expect(data.namespace.length).toMatchInlineSnapshot(`48`)
     expect(data.created_at).toMatch(iso8601Regex)
+  })
+
+  it('set a KV, no content type', async () => {
+    const createResponse = await SELF.fetch('https://example.com/create/', {
+      method: 'POST',
+      headers: { 'cf-connecting-ip': '::1' },
+    })
+    const { namespace } = await createResponse.json<CreateNamespace>()
+
+    const setResponse = await SELF.fetch(`https://example.com/${namespace}/foobar.json`, {
+      method: 'POST',
+      body: 'testing',
+      headers: { 'content-type': '' },
+    })
+    expect(setResponse.status).toBe(200)
+    const setData = await setResponse.json<SetKV>()
+    expect(setData.url).toEqual(`https://example.com/${namespace}/foobar.json`)
+    expect(setData.key).toMatchInlineSnapshot(`"foobar.json"`)
+    expect(setData.content_type).toBeNull()
+    expect(setData.size).toMatchInlineSnapshot(`7`)
+    expect(setData.created_at).toMatch(iso8601Regex)
+    expect(setData.expiration).toMatch(iso8601Regex)
+
+    const getResponse = await SELF.fetch(setData.url)
+    expect(getResponse.status).toBe(200)
+    const text = await getResponse.text()
+    expect(text).toMatchInlineSnapshot(`"testing"`)
+    const contentType = getResponse.headers.get('content-type')
+    expect(contentType).toBeNull()
   })
 
   it('set a KV, get a value', async () => {
