@@ -32,11 +32,14 @@ class AsyncCloudKV:
         assert self._client is not None
         await self._client.__aexit__(*args)
 
-    async def get(self, key: str) -> bytes:
+    async def get(self, key: str) -> bytes | None:
         assert key, 'Key cannot be empty'
         response = await self.client.get(f'{self.base_url}/{self.namespace}/{key}')
         ResponseError.check(response)
-        return response.content
+        if response.status_code == 244:
+            return None
+        else:
+            return response.content
 
     async def set(self, key: str, value: str, *, content_type: str | None = None, ttl: int | None = None) -> None:
         headers: dict[str, str] = {}

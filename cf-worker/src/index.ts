@@ -48,7 +48,11 @@ async function get(namespace: string, key: string, request: Request, env: Env): 
   if (!value || !metadata) {
     // only check the namespace if the key does not exist
     const row = await env.DB.prepare('select 1 from namespaces where id=?').bind(namespace).first()
-    return textResponse(row ? 'Key does not exist' : 'Namespace does not exist', 404)
+    if (row) {
+      return textResponse('Key does not exist', 244)
+    } else {
+      return textResponse('Namespace does not exist', 404)
+    }
   }
   return new Response(request.method === 'HEAD' ? '' : value, {
     headers: metadata.content_type ? { 'Content-Type': metadata.content_type } : {},
@@ -61,7 +65,7 @@ async function set(namespace: string, key: string, request: Request, env: Env): 
     content_type = content_type.split(';')[0]
   }
   if (key.length > MAX_KEY_SIZE) {
-    return textResponse(`Key length must not exceed ${MAX_KEY_SIZE}`, 400)
+    return textResponse(`Key length must not exceed ${MAX_KEY_SIZE}`, 414)
   }
 
   let ttl: number = MAX_TTL
@@ -82,7 +86,7 @@ async function set(namespace: string, key: string, request: Request, env: Env): 
     return textResponse('To set a key, the request body must not be empty', 400)
   }
   if (size > MAX_VALUE_SIZE) {
-    return textResponse(`Value size must not exceed ${MAX_VALUE_SIZE_MB}MB`, 400)
+    return textResponse(`Value size must not exceed ${MAX_VALUE_SIZE_MB}MB`, 413)
   }
 
   let { nsExists, nsSize } = (await env.DB.prepare(
@@ -102,7 +106,7 @@ select
   if (!nsExists) {
     return textResponse('Namespace does not exist', 404)
   } else if (nsSize + size > MAX_NAMESPACE_SIZE) {
-    return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 400)
+    return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 413)
   }
 
   const { created_at, expiration } = (await env.DB.prepare(
@@ -266,7 +270,7 @@ const dataKey = (namespace: string, key: string) => `data:${namespace}:${key}`
 const ctHeader = (contentType: string) => ({ 'Content-Type': contentType })
 
 const textResponse = (message: string, status: number) =>
-  new Response(message, { status, headers: ctHeader('text/plain') })
+  new Response(`${status}: ${message}`, { status, headers: ctHeader('text/plain') })
 const jsonResponse = (data: any) =>
   new Response(JSON.stringify(data, null, 2) + '\n', { headers: ctHeader('application/json') })
 
