@@ -21,10 +21,10 @@ class SyncCloudKV:
         self.base_url = base_url
 
     @classmethod
-    def create_namespace(cls, *, base_url: str = _shared.DEFAULT_BASE_URL) -> _shared.CreateResponse:
+    def create_namespace(cls, *, base_url: str = _shared.DEFAULT_BASE_URL) -> _shared.CreateNamespaceResponse:
         response = httpx.post(f'{base_url}/create')
         _shared.ResponseError.check(response)
-        return _shared.CreateResponse.model_validate_json(response.content)
+        return _shared.CreateNamespaceResponse.model_validate_json(response.content)
 
     def __enter__(self):
         self._client = httpx.Client()
@@ -44,7 +44,12 @@ class SyncCloudKV:
         else:
             return response.content
 
-    def set(self, key: str, value: str, *, content_type: str | None = None, ttl: int | None = None) -> None:
+    def set(self, key: str, value: str, *, content_type: str | None = None, ttl: int | None = None) -> str:
+        return self.set_info(key, value, content_type=content_type, ttl=ttl).url
+
+    def set_info(
+        self, key: str, value: str, *, content_type: str | None = None, ttl: int | None = None
+    ) -> _shared.SetResponse:
         if not self.namespace_write_key:
             raise RuntimeError("Namespace write key not provided, can't set keys")
         headers: dict[str, str] = {'authorization': self.namespace_write_key}
@@ -54,6 +59,7 @@ class SyncCloudKV:
             headers['TTL'] = str(ttl)
         response = self.client.post(f'{self.base_url}/{self.namespace_read_key}/{key}', content=value, headers=headers)
         _shared.ResponseError.check(response)
+        return _shared.SetResponse.model_validate_json(response.content)
 
     def delete(self, key: str) -> bool:
         if not self.namespace_write_key:

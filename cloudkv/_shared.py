@@ -29,10 +29,19 @@ def _escape_like_pattern(pattern: str) -> str:
     return pattern.replace('%', '\\%').replace('_', '\\_')
 
 
-class CreateResponse(pydantic.BaseModel):
+class CreateNamespaceResponse(pydantic.BaseModel):
     read_key: str
     write_key: str
     created_at: datetime
+
+
+class SetResponse(pydantic.BaseModel):
+    url: str
+    key: str
+    content_type: str
+    size: int
+    created_at: str
+    expiration: str
 
 
 class Key(pydantic.BaseModel):

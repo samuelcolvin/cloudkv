@@ -21,11 +21,11 @@ class AsyncCloudKV:
         self.base_url = base_url
 
     @classmethod
-    async def create_namespace(cls, *, base_url: str = _shared.DEFAULT_BASE_URL) -> _shared.CreateResponse:
+    async def create_namespace(cls, *, base_url: str = _shared.DEFAULT_BASE_URL) -> _shared.CreateNamespaceResponse:
         async with httpx.AsyncClient() as client:
             response = await client.post(f'{base_url}/create')
             _shared.ResponseError.check(response)
-            return _shared.CreateResponse.model_validate_json(response.content)
+            return _shared.CreateNamespaceResponse.model_validate_json(response.content)
 
     async def __aenter__(self):
         self._client = httpx.AsyncClient()
@@ -45,7 +45,13 @@ class AsyncCloudKV:
         else:
             return response.content
 
-    async def set(self, key: str, value: str, *, content_type: str | None = None, ttl: int | None = None) -> None:
+    async def set(self, key: str, value: str, *, content_type: str | None = None, ttl: int | None = None) -> str:
+        set_response = await self.set_info(key, value, content_type=content_type, ttl=ttl)
+        return set_response.url
+
+    async def set_info(
+        self, key: str, value: str, *, content_type: str | None = None, ttl: int | None = None
+    ) -> _shared.SetResponse:
         if not self.namespace_write_key:
             raise RuntimeError("Namespace write key not provided, can't set keys")
         headers: dict[str, str] = {'authorization': self.namespace_write_key}
@@ -57,6 +63,7 @@ class AsyncCloudKV:
             f'{self.base_url}/{self.namespace_read_key}/{key}', content=value, headers=headers
         )
         _shared.ResponseError.check(response)
+        return _shared.SetResponse.model_validate_json(response.content)
 
     async def delete(self, key: str) -> bool:
         if not self.namespace_write_key:
