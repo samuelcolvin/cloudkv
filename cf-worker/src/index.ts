@@ -22,17 +22,19 @@ export default {
       path = path.slice(0, -1)
     }
     // 24 length matches the string resulting from random(18)
-    const match = path.match(/^\/([a-zA-Z0-9]{24})\/?(.*)$/)
-    if (match) {
-      const [_, read_key, key] = match
+    const nsMatch = path.match(/^\/([a-zA-Z0-9]{24})\/?(.*)$/)
+    if (nsMatch) {
+      const [_, read_key, key] = nsMatch
       if (key === '') {
         return await list(read_key, request, env)
       } else if (request.method === 'GET' || request.method === 'HEAD') {
         return await get(read_key, key, request, env)
       } else if (request.method === 'POST') {
         return await set(read_key, key, request, env)
+      } else if (request.method === 'DELETE') {
+        return await del(read_key, key, request, env)
       } else {
-        return response405('GET', 'HEAD', 'POST')
+        return response405('GET', 'HEAD', 'POST', 'DELETE')
       }
     } else if (path === '/create') {
       return await create(request, env)
@@ -61,12 +63,9 @@ async function get(read_key: string, key: string, request: Request, env: Env): P
 }
 
 async function set(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
-  let auth = request.headers.get('Authorization')
+  const auth = getAuth(request)
   if (!auth) {
     return textResponse('Authorization header not provided', 401)
-  }
-  if (auth.toLowerCase().startsWith('bearer ')) {
-    auth = auth.slice(7)
   }
 
   let content_type = request.headers.get('Content-Type')
@@ -154,6 +153,36 @@ returning
     created_at,
     expiration,
   })
+}
+
+async function del(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
+  const auth = getAuth(request)
+  if (!auth) {
+    return textResponse('Authorization header not provided', 401)
+  }
+
+  let row = await env.DB.prepare(`select write_key as writeKey from namespaces where read_key = ?`)
+    .bind(read_key)
+    .first<{ writeKey: string }>()
+
+  if (!row) {
+    return textResponse('Namespace does not exist', 404)
+  }
+  const { writeKey } = row
+  if (!compareSecrets(auth, writeKey)) {
+    return textResponse('Authorization header does not match write key', 403)
+  }
+
+  await env.cloudkvData.delete(dataKey(read_key, key))
+  const deleteRow = await env.DB.prepare('delete from kv where namespace=? and key=? returning size')
+    .bind(read_key, key)
+    .first()
+
+  if (deleteRow) {
+    return textResponse('Key deleted', 200)
+  } else {
+    return textResponse('Key not found', 244)
+  }
 }
 
 interface KVMetadata {
@@ -291,6 +320,14 @@ function index(request: Request): Response {
   }
 }
 
+function getAuth(request: Request): string | null {
+  let auth = request.headers.get('Authorization')
+  if (auth && auth.toLowerCase().startsWith('bearer ')) {
+    auth = auth.slice(7)
+  }
+  return auth
+}
+
 const dataKey = (namespace: string, key: string) => `data:${namespace}:${key}`
 
 const ctHeader = (contentType: string) => ({ 'Content-Type': contentType })
@@ -300,7 +337,7 @@ const textResponse = (message: string, status: number) =>
 const jsonResponse = (data: any) =>
   new Response(JSON.stringify(data, null, 2) + '\n', { headers: ctHeader('application/json') })
 
-const response405 = (...allowMethods: string[]) => {
+function response405(...allowMethods: string[]): Response {
   const allow = allowMethods.join(', ')
   return new Response(`405: Method not allowed, Allowed: ${allow}`, {
     status: 405,
@@ -308,7 +345,7 @@ const response405 = (...allowMethods: string[]) => {
   })
 }
 
-const getIP = (request: Request): string => {
+function getIP(request: Request): string {
   const ip = request.headers.get('cf-connecting-ip')
   if (ip) {
     return ip

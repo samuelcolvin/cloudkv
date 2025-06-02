@@ -250,4 +250,86 @@ ${SQL}
     expect(wrongAuthResponse2.status).toBe(403)
     expect(await wrongAuthResponse2.text()).toEqual('403: Authorization header does not match write key')
   })
+
+  it('set, gets, delete, get, delete', async () => {
+    const createResponse = await SELF.fetch('https://example.com/create/', {
+      method: 'POST',
+      headers: { 'cf-connecting-ip': '::1' },
+    })
+    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+
+    const setResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+      method: 'POST',
+      body: 'testing',
+      headers: { Authorization: write_key },
+    })
+    expect(setResponse.status).toBe(200)
+    const setData = await setResponse.json<SetKV>()
+
+    const getResponse = await SELF.fetch(setData.url)
+    expect(getResponse.status).toBe(200)
+    expect(await getResponse.text()).toEqual('testing')
+
+    const deleteResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+      method: 'DELETE',
+      headers: { Authorization: write_key },
+    })
+    expect(deleteResponse.status).toBe(200)
+    expect(await deleteResponse.text()).toEqual('200: Key deleted')
+
+    const getResponse2 = await SELF.fetch(setData.url)
+    expect(getResponse2.status).toBe(244)
+    expect(await getResponse2.text()).toEqual('244: Key does not exist')
+
+    const deleteResponse2 = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+      method: 'DELETE',
+      headers: { Authorization: write_key },
+    })
+    expect(deleteResponse2.status).toBe(244)
+    expect(await deleteResponse2.text()).toEqual('244: Key not found')
+  })
+
+  it('delete no auth', async () => {
+    const deleteResponse = await SELF.fetch(`https://example.com/${'1'.repeat(24)}/foobar.json`, {
+      method: 'DELETE',
+    })
+    expect(deleteResponse.status).toBe(401)
+    expect(await deleteResponse.text()).toEqual('401: Authorization header not provided')
+  })
+
+  it('delete wrong auth', async () => {
+    const createResponse = await SELF.fetch('https://example.com/create/', {
+      method: 'POST',
+      headers: { 'cf-connecting-ip': '::1' },
+    })
+    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+
+    const setResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+      method: 'POST',
+      body: 'testing',
+      headers: { Authorization: write_key },
+    })
+    expect(setResponse.status).toBe(200)
+    const setData = await setResponse.json<SetKV>()
+
+    const deleteResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+      method: 'DELETE',
+      headers: { Authorization: write_key.toLowerCase() },
+    })
+    expect(deleteResponse.status).toBe(403)
+    expect(await deleteResponse.text()).toEqual('403: Authorization header does not match write key')
+
+    const getResponse = await SELF.fetch(setData.url)
+    expect(getResponse.status).toBe(200)
+    expect(await getResponse.text()).toEqual('testing')
+  })
+
+  it('delete no namespace', async () => {
+    const deleteResponse = await SELF.fetch(`https://example.com/${'1'.repeat(24)}/foobar.json`, {
+      method: 'DELETE',
+      headers: { Authorization: '1'.repeat(48) },
+    })
+    expect(deleteResponse.status).toBe(404)
+    expect(await deleteResponse.text()).toEqual('404: Namespace does not exist')
+  })
 })

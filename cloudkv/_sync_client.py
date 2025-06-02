@@ -55,6 +55,14 @@ class SyncCloudKV:
         response = self.client.post(f'{self.base_url}/{self.namespace_read_key}/{key}', content=value, headers=headers)
         _shared.ResponseError.check(response)
 
+    def delete(self, key: str) -> bool:
+        if not self.namespace_write_key:
+            raise RuntimeError("Namespace write key not provided, can't delete keys")
+        headers: dict[str, str] = {'authorization': self.namespace_write_key}
+        response = self.client.delete(f'{self.base_url}/{self.namespace_read_key}/{key}', headers=headers)
+        _shared.ResponseError.check(response)
+        return response.status_code == 200
+
     @typing.overload
     def keys(self, *, offset: int | None = None) -> list[_shared.Key]: ...
     @typing.overload
