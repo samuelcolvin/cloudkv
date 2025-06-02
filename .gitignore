@@ -4,6 +4,9 @@ __pycache__
 .ruff_cache
 .venv
 
+main.py
+example.py
+
 # Logs
 
 logs

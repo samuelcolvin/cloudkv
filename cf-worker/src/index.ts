@@ -21,15 +21,16 @@ export default {
     if (path.endsWith('/')) {
       path = path.slice(0, -1)
     }
-    const match = path.match(/^\/([a-zA-Z0-9]{48})\/?(.*)$/)
+    // 24 length matches the string resulting from random(18)
+    const match = path.match(/^\/([a-zA-Z0-9]{24})\/?(.*)$/)
     if (match) {
-      const [_, namespace, key] = match
+      const [_, read_key, key] = match
       if (key === '') {
-        return await list(namespace, request, env)
+        return await list(read_key, request, env)
       } else if (request.method === 'GET' || request.method === 'HEAD') {
-        return await get(namespace, key, request, env)
+        return await get(read_key, key, request, env)
       } else if (request.method === 'POST') {
-        return await set(namespace, key, request, env)
+        return await set(read_key, key, request, env)
       } else {
         return response405('GET', 'HEAD', 'POST')
       }
@@ -43,11 +44,11 @@ export default {
   },
 } satisfies ExportedHandler<Env>
 
-async function get(namespace: string, key: string, request: Request, env: Env): Promise<Response> {
-  const { value, metadata } = await env.cloudkvData.getWithMetadata<KVMetadata>(dataKey(namespace, key), 'stream')
+async function get(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
+  const { value, metadata } = await env.cloudkvData.getWithMetadata<KVMetadata>(dataKey(read_key, key), 'stream')
   if (!value || !metadata) {
     // only check the namespace if the key does not exist
-    const row = await env.DB.prepare('select 1 from namespaces where id=?').bind(namespace).first()
+    const row = await env.DB.prepare('select 1 from namespaces where read_key=?').bind(read_key).first()
     if (row) {
       return textResponse('Key does not exist', 244)
     } else {
@@ -59,11 +60,16 @@ async function get(namespace: string, key: string, request: Request, env: Env): 
   })
 }
 
-async function set(namespace: string, key: string, request: Request, env: Env): Promise<Response> {
-  let content_type = request.headers.get('Content-Type')
-  if (content_type) {
-    content_type = content_type.split(';')[0]
+async function set(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
+  let auth = request.headers.get('Authorization')
+  if (!auth) {
+    return textResponse('Authorization header not provided', 401)
   }
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    auth = auth.slice(7)
+  }
+
+  let content_type = request.headers.get('Content-Type')
   if (key.length > MAX_KEY_SIZE) {
     return textResponse(`Key length must not exceed ${MAX_KEY_SIZE}`, 414)
   }
@@ -89,22 +95,24 @@ async function set(namespace: string, key: string, request: Request, env: Env): 
     return textResponse(`Value size must not exceed ${MAX_VALUE_SIZE_MB}MB`, 413)
   }
 
-  let { nsExists, nsSize } = (await env.DB.prepare(
+  let { writeKey, nsSize } = (await env.DB.prepare(
     `
 select
-  exists (select 1 from namespaces where id = ?) as nsExists,
+  (select write_key from namespaces where read_key = ?) as writeKey,
   (
     select coalesce(sum(size), 0)
     from kv
-    where namespace_id = ? and key != ? and expiration > datetime('now')
+    where namespace = ? and key != ? and expiration > datetime('now')
   ) as nsSize;
 `,
   )
-    .bind(namespace, namespace, key)
-    .first<{ nsExists: number; nsSize: number }>())!
+    .bind(read_key, read_key, key)
+    .first<{ writeKey: string | null; nsSize: number }>())!
 
-  if (!nsExists) {
+  if (!writeKey) {
     return textResponse('Namespace does not exist', 404)
+  } else if (!compareSecrets(auth, writeKey)) {
+    return textResponse('Authorization header does not match write key', 403)
   } else if (nsSize + size > MAX_NAMESPACE_SIZE) {
     return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 413)
   }
@@ -112,7 +120,7 @@ select
   const { created_at, expiration } = (await env.DB.prepare(
     `
 insert into kv
-  (namespace_id, key, content_type, size, expiration)
+  (namespace, key, content_type, size, expiration)
 values (?, ?, ?, ?, datetime('now', ?))
 on conflict do update set
   content_type = excluded.content_type,
@@ -124,14 +132,14 @@ returning
   ${sqlIsoDate('expiration')} as expiration
 `,
   )
-    .bind(namespace, key, content_type, size, `+${ttl} seconds`)
+    .bind(read_key, key, content_type, size, `+${ttl} seconds`)
     .first<{ created_at: string; expiration: string }>())!
 
-  await env.DB.prepare("delete from kv where namespace_id = ? and expiration < datetime('now')").bind(namespace).run()
+  await env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(read_key).run()
 
   const metadata: KVMetadata = { content_type }
   const expirationDate = new Date(expiration)
-  await env.cloudkvData.put(dataKey(namespace, key), body, {
+  await env.cloudkvData.put(dataKey(read_key, key), body, {
     expiration: expirationDate.getTime() / 1000,
     metadata,
   })
@@ -168,12 +176,12 @@ interface ListResponse {
   keys: ListKey[]
 }
 
-async function list(namespace: string, request: Request, env: Env): Promise<Response> {
+async function list(read_key: string, request: Request, env: Env): Promise<Response> {
   if (request.method !== 'GET') {
     return response405('GET')
   }
 
-  const nsExists = await env.DB.prepare('select 1 from namespaces where id=?').bind(namespace).first()
+  const nsExists = await env.DB.prepare('select 1 from namespaces where read_key=?').bind(read_key).first()
   if (!nsExists) {
     return textResponse('Namespace does not exist', 404)
   }
@@ -190,11 +198,11 @@ async function list(namespace: string, request: Request, env: Env): Promise<Resp
     }
   }
   // clean the URL to use when building the key URL
-  url.pathname = `/${namespace}`
+  url.pathname = `/${read_key}`
   url.search = ''
   url.hash = ''
 
-  const params = like ? [namespace, like, offset] : [namespace, offset]
+  const params = like ? [read_key, like, offset] : [read_key, offset]
   const result = await env.DB.prepare(
     `
 select
@@ -204,7 +212,7 @@ select
   ${sqlIsoDate('created_at')} as created_at,
   ${sqlIsoDate('expiration')} as expiration
 from kv
-where namespace_id = ? and expiration > datetime('now') ${like ? `and key like ?` : ''}
+where namespace = ? and expiration > datetime('now') ${like ? `and key like ?` : ''}
 order by created_at
 limit 1000
 offset ?
@@ -244,20 +252,38 @@ where created_at > datetime('now', '-24 hours')
     return textResponse(`IP limit (${MAX_IP_24}) on namespace creation per 24 hours exceeded`, 429)
   }
 
-  let namespace = uniqueId()
-  let { created_at } = (await env.DB.prepare(
-    `insert into namespaces (id, ip) values (?, ?) returning ${sqlIsoDate('created_at')} as created_at`,
-  )
-    .bind(namespace, ip)
-    .first<{ created_at: string }>())!
-  return jsonResponse({ namespace, created_at })
+  while (true) {
+    // 18 bytes alwasy results in a string of length 24
+    const read_key = random(18)
+    // 36 bytes alwasy results in a string of length 48
+    const write_key = random(36)
+    const row = await env.DB.prepare(
+      `
+insert into namespaces (read_key, write_key, ip) values (?, ?, ?)
+on conflict do nothing
+returning ${sqlIsoDate('created_at')} as created_at
+`,
+    )
+      .bind(read_key, write_key, ip)
+      .first<{ created_at: string }>()
+    if (row) {
+      const { created_at } = row
+      return jsonResponse({ read_key, write_key, created_at })
+    }
+  }
 }
 
 function index(request: Request): Response {
   if (request.method === 'GET') {
-    return new Response('<h1>Cloud KV</h1><p>See <a href="#">samuelcolvin/cloudkv</a> for details.</p>', {
-      headers: ctHeader('text/html'),
-    })
+    return new Response(
+      `\
+<h1>Cloud KV</h1>
+<p>See <a href="https://github.com/samuelcolvin/cloudkv">github.com/samuelcolvin/cloudkv</a> for details.</p>
+`,
+      {
+        headers: ctHeader('text/html'),
+      },
+    )
   } else if (request.method === 'HEAD') {
     return new Response('', { headers: ctHeader('text/html') })
   } else {
@@ -276,7 +302,7 @@ const jsonResponse = (data: any) =>
 
 const response405 = (...allowMethods: string[]) => {
   const allow = allowMethods.join(', ')
-  return new Response(`Method not allowed, Allowed: ${allow}`, {
+  return new Response(`405: Method not allowed, Allowed: ${allow}`, {
     status: 405,
     headers: { allow, ...ctHeader('text/plain') },
   })
@@ -290,15 +316,31 @@ const getIP = (request: Request): string => {
     throw new Error('IP address not found')
   }
 }
-const sqlIsoDate = (field: string) => `strftime('%Y-%m-%dT%H:%M:%SZ', ${field})`
+const sqlIsoDate = (field: 'created_at' | 'expiration') => `strftime('%Y-%m-%dT%H:%M:%SZ', ${field})`
 
-// this will always generate an alphanumeric string of 48 characters
-function uniqueId(): string {
-  const uint8Array = new Uint8Array(36)
+/// Generate a random string and encode it as URL safe base64
+function random(bytes: number): string {
+  const uint8Array = new Uint8Array(bytes)
   crypto.getRandomValues(uint8Array)
   // Convert Uint8Array to binary string
   const binaryString = String.fromCharCode.apply(null, Array.from(uint8Array))
   // Encode to base64, and replace `/` with 'a' and `+` with 'b' and `=` with 'c'
-  // (this reduces entropy very slightly but makes the search easier to use)
+  // (this reduces entropy very slightly but makes the secret alpha numeric and easier to use)
   return btoa(binaryString).replaceAll('/', 'a').replaceAll('+', 'b').replaceAll('=', 'c')
+}
+
+/// Compare two strings in a constant time manner.
+// How much this matters in this case isn't clear, but may as well do it this way.
+function compareSecrets(s1: string, s2: string) {
+  if (s1.length !== s2.length) {
+    return false
+  } else {
+    let isEqual = true
+    for (let i = 0; i < s1.length; i++) {
+      if (s1.charCodeAt(i) !== s2.charCodeAt(i)) {
+        isEqual = false
+      }
+    }
+    return isEqual
+  }
 }
