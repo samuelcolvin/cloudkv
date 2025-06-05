@@ -42,11 +42,11 @@ def decode_value(
         return default
     elif force_validate or content_type == PYDANTIC_CONTENT_TYPE:
         return cached_type_adapter(return_type).validate_json(data)
-    elif return_type == bytes:
+    elif return_type is bytes:
         return typing.cast(T, data)
-    elif return_type == str:
+    elif return_type is str:
         return typing.cast(T, data.decode())
-    elif return_type == bytearray:
+    elif return_type is bytearray:
         return typing.cast(T, bytearray(data))
     else:
         raise RuntimeError(f'Content-Type was not {PYDANTIC_CONTENT_TYPE!r} and return_type was not a string type')

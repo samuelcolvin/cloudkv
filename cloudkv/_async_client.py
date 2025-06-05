@@ -47,7 +47,7 @@ class AsyncCloudKV:
         response = await self.client.get(f'{self.base_url}/{self.namespace_read_key}/{key}')
         _shared.ResponseError.check(response)
         if response.status_code == 244:
-            return None
+            return None, None
         else:
             return response.content, response.headers.get('Content-Type')
 
