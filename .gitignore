@@ -6,6 +6,7 @@ __pycache__
 
 main.py
 example.py
+.coverage*
 
 # Logs
 
