@@ -80,3 +80,7 @@ typeCheckingMode = "strict"
 reportUnnecessaryTypeIgnoreComment = true
 include = ["cloudkv", "tests"]
 venv = ".venv"
+
+[tool.codespell]
+# Ref: https://github.com/codespell-project/codespell#using-a-config-file
+skip = 'cf-worker/worker-configuration.d.ts,cf-worker/package-lock.json'

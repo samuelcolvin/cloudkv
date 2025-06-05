@@ -282,9 +282,9 @@ where created_at > datetime('now', '-24 hours')
   }
 
   while (true) {
-    // 18 bytes alwasy results in a string of length 24
+    // 18 bytes always results in a string of length 24
     const read_key = random(18)
-    // 36 bytes alwasy results in a string of length 48
+    // 36 bytes always results in a string of length 48
     const write_key = random(36)
     const row = await env.DB.prepare(
       `
