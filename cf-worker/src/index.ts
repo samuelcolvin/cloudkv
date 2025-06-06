@@ -17,31 +17,36 @@ const MAX_KEY_SIZE = 2048
 
 export default {
   async fetch(request, env, _ctx): Promise<Response> {
-    let path = new URL(request.url).pathname
-    if (path.endsWith('/')) {
-      path = path.slice(0, -1)
-    }
-    // 24 length matches the string resulting from random(18)
-    const nsMatch = path.match(/^\/([a-zA-Z0-9]{24})\/?(.*)$/)
-    if (nsMatch) {
-      const [_, read_key, key] = nsMatch
-      if (key === '') {
-        return await list(read_key, request, env)
-      } else if (request.method === 'GET' || request.method === 'HEAD') {
-        return await get(read_key, key, request, env)
-      } else if (request.method === 'POST') {
-        return await set(read_key, key, request, env)
-      } else if (request.method === 'DELETE') {
-        return await del(read_key, key, request, env)
-      } else {
-        return response405('GET', 'HEAD', 'POST', 'DELETE')
+    try {
+      let path = new URL(request.url).pathname
+      if (path.endsWith('/')) {
+        path = path.slice(0, -1)
       }
-    } else if (path === '/create') {
-      return await create(request, env)
-    } else if (path === '') {
-      return index(request)
-    } else {
-      return textResponse('Path not found', 404)
+      // 24 length matches the string resulting from random(18)
+      const nsMatch = path.match(/^\/([a-zA-Z0-9]{24})\/?(.*)$/)
+      if (nsMatch) {
+        const [_, read_key, key] = nsMatch
+        if (key === '') {
+          return await list(read_key, request, env)
+        } else if (request.method === 'GET' || request.method === 'HEAD') {
+          return await get(read_key, key, request, env)
+        } else if (request.method === 'POST') {
+          return await set(read_key, key, request, env)
+        } else if (request.method === 'DELETE') {
+          return await del(read_key, key, request, env)
+        } else {
+          return response405('GET', 'HEAD', 'POST', 'DELETE')
+        }
+      } else if (path === '/create') {
+        return await create(request, env)
+      } else if (path === '') {
+        return index(request)
+      } else {
+        return textResponse('Path not found', 404)
+      }
+    } catch (error) {
+      console.error(error)
+      return textResponse('Internal Server Error', 500)
     }
   },
 } satisfies ExportedHandler<Env>
