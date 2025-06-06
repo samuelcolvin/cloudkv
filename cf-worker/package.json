@@ -26,5 +26,9 @@
     "typescript": "^5.5.2",
     "vitest": "~3.0.7",
     "wrangler": "^4.17.0"
+  },
+  "dependencies": {
+    "@pydantic/logfire-api": "^0.4.1",
+    "@pydantic/logfire-cf-workers": "^0.4.3"
   }
 }
