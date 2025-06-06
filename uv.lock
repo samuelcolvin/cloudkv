@@ -52,7 +52,6 @@ name = "cloudkv"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "coverage" },
     { name = "eval-type-backport" },
     { name = "httpx" },
     { name = "pydantic" },
@@ -60,6 +59,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "coverage" },
     { name = "devtools" },
     { name = "pyright" },
     { name = "pytest" },
@@ -69,7 +69,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "coverage", specifier = ">=7.8.2" },
     { name = "eval-type-backport", specifier = ">=0.2.2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2.11.5" },
@@ -77,6 +76,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "coverage", specifier = ">=7.8.2" },
     { name = "devtools", specifier = ">=0.12.2" },
     { name = "pyright", specifier = ">=1.1.398" },
     { name = "pytest", specifier = ">=8.4.0" },

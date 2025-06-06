@@ -5,7 +5,7 @@
   "scripts": {
     "format": "prettier --write -- .",
     "lint": "prettier --check -- .",
-    "typecheck": "tsc --noEmit &&cd test && tsc --noEmit",
+    "typecheck": "tsc --noEmit && cd test && tsc --noEmit",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",

@@ -1,13 +1,11 @@
 from __future__ import annotations as _annotations
 
 import typing
-from datetime import datetime
 
-import httpx
 import pydantic
 
-DEFAULT_BASE_URL = 'https://cloudkv.samuelcolvin.workers.dev'
-PYDANTIC_CONTENT_TYPE = 'application/json; pydantic'
+from .shared import PYDANTIC_CONTENT_TYPE
+
 T = typing.TypeVar('T')
 D = typing.TypeVar('D')
 ta_lookup: dict[str, pydantic.TypeAdapter[typing.Any]] = {}
@@ -71,38 +69,3 @@ def keys_query_params(
 
 def _escape_like_pattern(pattern: str) -> str:
     return pattern.replace('%', '\\%').replace('_', '\\_')
-
-
-class CreateNamespaceDetails(pydantic.BaseModel):
-    read_key: str
-    write_key: str
-    created_at: datetime
-
-
-class SetDetails(pydantic.BaseModel):
-    url: str
-    key: str
-    content_type: str
-    size: int
-    created_at: str
-    expiration: str
-
-
-class Key(pydantic.BaseModel):
-    url: str
-    key: str
-    content_type: str | None
-    size: int
-    created_at: datetime
-    expiration: datetime
-
-
-class KeysResponse(pydantic.BaseModel):
-    keys: list[Key]
-
-
-class ResponseError(ValueError):
-    @classmethod
-    def check(cls, response: httpx.Response) -> None:
-        if not response.is_success:
-            raise cls(f'Unexpected {response.status_code} response: {response.text}')
