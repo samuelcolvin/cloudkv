@@ -18,8 +18,11 @@ class SyncCloudKV:
     """
 
     namespace_read_api_key: str
+    """Key used to get values and list keys."""
     namespace_write_api_key: str | None
+    """Key required to set and delete keys."""
     base_url: str
+    """Base URL to connect to."""
     _client: _httpx.Client | None = None
 
     def __init__(self, read_api_key: str, write_api_key: str | None, *, base_url: str = _shared.DEFAULT_BASE_URL):
@@ -27,7 +30,8 @@ class SyncCloudKV:
 
         Args:
             read_api_key: Read API key for the namespace.
-            write_api_key: Write API key for the namespace.
+            write_api_key: Write API key for the namespace, maybe unset if you only have permission to read values
+                and list keys.
             base_url: Base URL to connect to.
         """
         self.namespace_read_api_key = read_api_key
