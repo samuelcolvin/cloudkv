@@ -10,8 +10,7 @@ __all__ = (
     'DEFAULT_BASE_URL',
     'PYDANTIC_CONTENT_TYPE',
     'CreateNamespaceDetails',
-    'SetDetails',
-    'Key',
+    'KeyInfo',
     'KeysResponse',
     'ResponseError',
 )
@@ -21,30 +20,30 @@ PYDANTIC_CONTENT_TYPE = 'application/json; pydantic'
 
 class CreateNamespaceDetails(pydantic.BaseModel):
     read_key: str
+    """Read API key for the namespace"""
     write_key: str
+    """Write API key for the namespace"""
     created_at: datetime
+    """Creation time of the namespace"""
 
 
-class SetDetails(pydantic.BaseModel):
+class KeyInfo(pydantic.BaseModel):
     url: str
+    """URL of the key/value"""
     key: str
-    content_type: str
-    size: int
-    created_at: str
-    expiration: str
-
-
-class Key(pydantic.BaseModel):
-    url: str
-    key: str
+    """The key set"""
     content_type: str | None
+    """Content type of the value"""
     size: int
+    """Size of the value"""
     created_at: datetime
+    """Creation time of the key/value"""
     expiration: datetime
+    """Expiration time of the key/value"""
 
 
 class KeysResponse(pydantic.BaseModel):
-    keys: list[Key]
+    keys: list[KeyInfo]
 
 
 class ResponseError(ValueError):

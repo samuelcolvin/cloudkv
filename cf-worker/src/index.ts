@@ -153,7 +153,7 @@ returning
   return jsonResponse({
     url,
     key,
-    content_type: content_type,
+    content_type,
     size,
     created_at,
     expiration,

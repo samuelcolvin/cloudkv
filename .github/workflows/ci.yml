@@ -36,7 +36,7 @@ jobs:
         env:
           SKIP: no-commit-to-branch
 
-  test:
+  test-python:
     name: test py${{ matrix.python-version }}
 
     strategy:
@@ -49,7 +49,7 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -58,10 +58,25 @@ jobs:
       - run: uv sync
       - run: uv run pytest
 
+  test-cf-worker:
+    name: test cf worker
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+
+      - run: npm i
+        working-directory: cf-worker
+
+      - run: npm run test
+        working-directory: cf-worker
+
   # https://github.com/marketplace/actions/alls-green#why used for branch protection checks
   check:
     if: always()
-    needs: [lint, test]
+    needs: [lint, test-python, test-cf-worker]
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed

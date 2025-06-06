@@ -5,15 +5,16 @@
 [![versions](https://img.shields.io/pypi/pyversions/cloudkv.svg)](https://github.com/samuelcolvin/cloudkv)
 [![license](https://img.shields.io/github/license/samuelcolvin/cloudkv.svg)](https://github.com/samuelcolvin/cloudkv/blob/main/LICENSE)
 
-key/value store based on Cloudflare workers.
+key/value store based on Cloudflare workers, usable as a Python package.
 
-By default the `cloudkv` package connects to [cloudkv.samuelcolvin.workers.dev](https://cloudkv.samuelcolvin.workers.dev) but you can deploy an instance to your own cloudflare worker if you prefer. Code for the server is in [./cf-worker](https://github.com/samuelcolvin/cloudkv/tree/docs/cf-worker).
+By default the `cloudkv` Python package connects to [cloudkv.samuelcolvin.workers.dev](https://cloudkv.samuelcolvin.workers.dev) but you can deploy an instance to your own cloudflare worker if you prefer. Code for the server is in [./cf-worker](https://github.com/samuelcolvin/cloudkv/tree/docs/cf-worker).
 
 Some reasons you might use cloudkv:
-* zero DB setup or account required, just create a namespace with the CLI and get started
-* sync and async clients with almost identical APIs
-* completely open source, deploy your own cloudflare worker if you like
-* Pydantic integration for to retrieve values as virtually and Python type
+* Zero DB setup or account required, just create a namespace with the CLI and get started
+* Sync and async clients with almost identical APIs
+* Completely open source, deploy your own cloudflare worker if you like or used the hosted one
+* Pydantic integration to retrieve values as virtually and Python type
+* View any value via it's URL
 
 ## Installation
 
@@ -87,7 +88,7 @@ asyncio.run(main())
 
 `SyncCloudKV` has the follow methods.
 
-_(`AsyncCloudKV` has identical methods except they're async it must be used as an async context manager.)_
+_(`AsyncCloudKV` has identical methods except they're async and it must be used as an async context manager)_
 
 ```py
 class SyncCloudKV:
@@ -188,7 +189,7 @@ class SyncCloudKV:
             URL of the set operation.
         """
 
-    def set_details(self, key: str, value: T, *, content_type: str | None = None, expires: int | None = None, value_type: type[T] | None = None) -> SetDetails:
+    def set_details(self, key: str, value: T, *, content_type: str | None = None, expires: int | None = None, value_type: type[T] | None = None) -> KeyInfo:
         """Set a value in the namespace and return details.
 
         Args:
@@ -200,7 +201,7 @@ class SyncCloudKV:
             value_type: type of the value, if set this is used by pydantic to serialize the value
 
         Returns:
-            Details of the key value pair as `SetDetails`.
+            Details of the key value pair as `KeyInfo`.
         """
 
     def delete(self, key: str) -> bool:
@@ -212,4 +213,56 @@ class SyncCloudKV:
         Returns:
             True if the key was deleted, False otherwise.
         """
-"""
+
+    def keys(
+        self,
+        *,
+        starts_with: str | None = None,
+        ends_with: str | None = None,
+        contains: str | None = None,
+        like: str | None = None,
+        offset: int | None = None,
+    ) -> list[KeyInfo]:
+        """List keys in the namespace.
+
+        Parameters `starts_with`, `ends_with`, `contains` and `like` are mutually exclusive - you can only used one
+        them at a tie.
+
+        Args:
+            starts_with: Filter to keys that start with this string.
+            ends_with: Filter to keys that end with this string.
+            contains: Filter to keys that contain this string.
+            like: Filter to keys that match this SQL-like pattern.
+            offset: Offset the results by this number of keys.
+
+        Returns:
+            A list of keys.
+        """
+```
+
+Types shown above have the following structure:
+
+```py
+class CreateNamespaceDetails(pydantic.BaseModel):
+    read_key: str
+    """Read API key for the namespace"""
+    write_key: str
+    """Write API key for the namespace"""
+    created_at: datetime
+    """Creation time of the namespace"""
+
+
+class KeyInfo(pydantic.BaseModel):
+    url: str
+    """URL of the key/value"""
+    key: str
+    """The key set"""
+    content_type: str | None
+    """Content type of the value"""
+    size: int
+    """Size of the value"""
+    created_at: datetime
+    """Creation time of the key/value"""
+    expiration: datetime
+    """Expiration time of the key/value"""
+```
