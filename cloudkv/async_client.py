@@ -144,7 +144,7 @@ class AsyncCloudKV:
         content_type: str | None = None,
         ttl: int | None = None,
         value_type: type[T] | None = None,
-    ) -> _shared.SetDetails:
+    ) -> _shared.KeyInfo:
         """Set a value in the namespace and return details.
 
         Args:
@@ -156,7 +156,7 @@ class AsyncCloudKV:
             value_type: type of the value, if set this is used by pydantic to serialize the value
 
         Returns:
-            Details of the key value pair as `SetDetails`.
+            Details of the key value pair as `KeyInfo`.
         """
         if not self.namespace_write_api_key:
             raise RuntimeError("Namespace write key not provided, can't set")
@@ -174,7 +174,7 @@ class AsyncCloudKV:
             f'{self.base_url}/{self.namespace_read_api_key}/{key}', content=binary_value, headers=headers
         )
         _shared.ResponseError.check(response)
-        return _shared.SetDetails.model_validate_json(response.content)
+        return _shared.KeyInfo.model_validate_json(response.content)
 
     async def delete(self, key: str) -> bool:
         """Delete a key.
@@ -193,15 +193,15 @@ class AsyncCloudKV:
         return response.status_code == 200
 
     @_typing.overload
-    async def keys(self, *, offset: int | None = None) -> list[_shared.Key]: ...
+    async def keys(self, *, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    async def keys(self, *, starts_with: str, offset: int | None = None) -> list[_shared.Key]: ...
+    async def keys(self, *, starts_with: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    async def keys(self, *, ends_with: str, offset: int | None = None) -> list[_shared.Key]: ...
+    async def keys(self, *, ends_with: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    async def keys(self, *, contains: str, offset: int | None = None) -> list[_shared.Key]: ...
+    async def keys(self, *, contains: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    async def keys(self, *, like: str, offset: int | None = None) -> list[_shared.Key]: ...
+    async def keys(self, *, like: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
 
     async def keys(
         self,
@@ -211,7 +211,7 @@ class AsyncCloudKV:
         contains: str | None = None,
         like: str | None = None,
         offset: int | None = None,
-    ) -> list[_shared.Key]:
+    ) -> list[_shared.KeyInfo]:
         """List keys in the namespace.
 
         Parameters `starts_with`, `ends_with`, `contains` and `like` are mutually exclusive - you can only used one

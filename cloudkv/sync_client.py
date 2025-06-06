@@ -141,7 +141,7 @@ class SyncCloudKV:
         content_type: str | None = None,
         expires: int | None = None,
         value_type: type[T] | None = None,
-    ) -> _shared.SetDetails:
+    ) -> _shared.KeyInfo:
         """Set a value in the namespace and return details.
 
         Args:
@@ -153,7 +153,7 @@ class SyncCloudKV:
             value_type: type of the value, if set this is used by pydantic to serialize the value
 
         Returns:
-            Details of the key value pair as `SetDetails`.
+            Details of the key value pair as `KeyInfo`.
         """
         if not self.namespace_write_api_key:
             raise RuntimeError("Namespace write key not provided, can't set")
@@ -171,7 +171,7 @@ class SyncCloudKV:
             f'{self.base_url}/{self.namespace_read_api_key}/{key}', content=binary_value, headers=headers
         )
         _shared.ResponseError.check(response)
-        return _shared.SetDetails.model_validate_json(response.content)
+        return _shared.KeyInfo.model_validate_json(response.content)
 
     def delete(self, key: str) -> bool:
         """Delete a key.
@@ -190,15 +190,15 @@ class SyncCloudKV:
         return response.status_code == 200
 
     @_typing.overload
-    def keys(self, *, offset: int | None = None) -> list[_shared.Key]: ...
+    def keys(self, *, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    def keys(self, *, starts_with: str, offset: int | None = None) -> list[_shared.Key]: ...
+    def keys(self, *, starts_with: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    def keys(self, *, ends_with: str, offset: int | None = None) -> list[_shared.Key]: ...
+    def keys(self, *, ends_with: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    def keys(self, *, contains: str, offset: int | None = None) -> list[_shared.Key]: ...
+    def keys(self, *, contains: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
     @_typing.overload
-    def keys(self, *, like: str, offset: int | None = None) -> list[_shared.Key]: ...
+    def keys(self, *, like: str, offset: int | None = None) -> list[_shared.KeyInfo]: ...
 
     def keys(
         self,
@@ -208,7 +208,7 @@ class SyncCloudKV:
         contains: str | None = None,
         like: str | None = None,
         offset: int | None = None,
-    ) -> list[_shared.Key]:
+    ) -> list[_shared.KeyInfo]:
         """List keys in the namespace.
 
         Parameters `starts_with`, `ends_with`, `contains` and `like` are mutually exclusive - you can only used one

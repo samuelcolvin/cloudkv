@@ -50,8 +50,9 @@ ${SQL}
     expect(response.status).toBe(200)
     expect(await response.text()).toMatchInlineSnapshot(
       `
-      "<h1>Cloud KV</h1>
+      "<h1>cloudkv</h1>
       <p>See <a href="https://github.com/samuelcolvin/cloudkv">github.com/samuelcolvin/cloudkv</a> for details.</p>
+      <p>release: [unknown]</p>
       "
     `,
     )
