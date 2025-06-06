@@ -19,7 +19,7 @@ const MAX_TTL = 60 * 60 * 24 * 365 * 10
 const MAX_KEY_SIZE = 2048
 
 const handler = {
-  async fetch(request, env, _ctx): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     try {
       let path = new URL(request.url).pathname
       if (path.endsWith('/')) {
@@ -34,7 +34,7 @@ const handler = {
         } else if (request.method === 'GET' || request.method === 'HEAD') {
           return await get(read_key, key, request, env)
         } else if (request.method === 'POST') {
-          return await set(read_key, key, request, env)
+          return await set(read_key, key, request, env, ctx)
         } else if (request.method === 'DELETE') {
           return await del(read_key, key, request, env)
         } else {
@@ -77,7 +77,13 @@ async function get(read_key: string, key: string, request: Request, env: Env): P
   })
 }
 
-async function set(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
+async function set(
+  read_key: string,
+  key: string,
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
   const auth = getAuth(request)
   if (!auth) {
     return textResponse('Authorization header not provided', 401)
@@ -131,8 +137,8 @@ select
     return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 413)
   }
 
-  const [{ created_at, expiration }] = await Promise.all([
-    (await env.DB.prepare(
+  const [row] = await Promise.all([
+    env.DB.prepare(
       `
       insert into kv
         (namespace, key, content_type, size, expiration)
@@ -147,13 +153,16 @@ select
       ${sqlIsoDate('expiration')} as expiration`,
     )
       .bind(read_key, key, content_type, size, `+${ttl} seconds`)
-      .first<{ created_at: string; expiration: string }>())!,
-    env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(read_key).run(),
+      .first<{ created_at: string; expiration: string }>(),
     env.cloudkvData.put(dataKey(read_key, key), body, {
       expirationTtl: ttl + 5,
       metadata: { content_type } satisfies KVMetadata,
     }),
   ])
+  const { created_at, expiration } = row!
+  ctx.waitUntil(
+    env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(read_key).run(),
+  )
 
   const url = new URL(request.url)
   url.search = ''
