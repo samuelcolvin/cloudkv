@@ -9,6 +9,9 @@
       "id": "65c0dc619af8484da481c31e080b528f",
     },
   ],
+  "vars": {
+    "GITHUB_SHA": "[unknown]",
+  },
   "d1_databases": [
     {
       "binding": "DB",

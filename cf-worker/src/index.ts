@@ -40,7 +40,7 @@ export default {
       } else if (path === '/create') {
         return await create(request, env)
       } else if (path === '') {
-        return index(request)
+        return index(request, env.GITHUB_SHA)
       } else {
         return textResponse('Path not found', 404)
       }
@@ -307,12 +307,13 @@ returning ${sqlIsoDate('created_at')} as created_at
   }
 }
 
-function index(request: Request): Response {
+function index(request: Request, github_sha: string): Response {
   if (request.method === 'GET') {
     return new Response(
       `\
 <h1>cloudkv</h1>
 <p>See <a href="https://github.com/samuelcolvin/cloudkv">github.com/samuelcolvin/cloudkv</a> for details.</p>
+<p>release: <code>${github_sha}</code></p>
 `,
       {
         headers: ctHeader('text/html'),
