@@ -1,3 +1,6 @@
+import * as logfire from '@pydantic/logfire-api'
+import { instrument } from '@pydantic/logfire-cf-workers'
+
 const MB = 1024 * 1024
 // maximum number of namespaces that can be created in 24 hours, across all IPs
 const MAX_GLOBAL_24 = 1000
@@ -15,7 +18,7 @@ const MIN_TTL = 60
 const MAX_TTL = 60 * 60 * 24 * 365 * 10
 const MAX_KEY_SIZE = 2048
 
-export default {
+const handler = {
   async fetch(request, env, _ctx): Promise<Response> {
     try {
       let path = new URL(request.url).pathname
@@ -45,11 +48,17 @@ export default {
         return textResponse('Path not found', 404)
       }
     } catch (error) {
-      console.error(error)
+      logfire.error('Internal Server Error', { error })
       return textResponse('Internal Server Error', 500)
     }
   },
 } satisfies ExportedHandler<Env>
+
+export default instrument(handler, {
+  service: {
+    name: 'cf-worker',
+  },
+})
 
 async function get(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
   const { value, metadata } = await env.cloudkvData.getWithMetadata<KVMetadata>(dataKey(read_key, key), 'stream')
@@ -281,8 +290,10 @@ where created_at > datetime('now', '-24 hours')
     .first<{ globalCount: number; ipCount: number }>())!
 
   if (globalCount > MAX_GLOBAL_24) {
+    logfire.warning('Global NS limit exceeded', { globalCount, ipCount })
     return textResponse(`Global limit (${MAX_GLOBAL_24}) on namespace creation per 24 hours exceeded`, 429)
   } else if (ipCount > MAX_IP_24) {
+    logfire.warning('IP NS limit exceeded', { globalCount, ipCount })
     return textResponse(`IP limit (${MAX_IP_24}) on namespace creation per 24 hours exceeded`, 429)
   }
 
@@ -302,6 +313,7 @@ returning ${sqlIsoDate('created_at')} as created_at
       .first<{ created_at: string }>()
     if (row) {
       const { created_at } = row
+      logfire.info('Namespace created', { read_key, created_at, ip })
       return jsonResponse({ read_key, write_key, created_at })
     }
   }
