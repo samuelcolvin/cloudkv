@@ -48,7 +48,8 @@ const handler = {
         return textResponse('Path not found', 404)
       }
     } catch (error) {
-      logfire.error('Internal Server Error', { error })
+      console.error(error)
+      logfire.error('Internal Server Error', { error: (error as any).toString() })
       return textResponse('Internal Server Error', 500)
     }
   },
@@ -130,32 +131,30 @@ select
     return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 413)
   }
 
-  const { created_at, expiration } = (await env.DB.prepare(
-    `
-insert into kv
-  (namespace, key, content_type, size, expiration)
-values (?, ?, ?, ?, datetime('now', ?))
-on conflict do update set
-  content_type = excluded.content_type,
-  size = excluded.size,
-  created_at = datetime('now'),
-  expiration = excluded.expiration
-returning
-  ${sqlIsoDate('created_at')} as created_at,
-  ${sqlIsoDate('expiration')} as expiration
-`,
-  )
-    .bind(read_key, key, content_type, size, `+${ttl} seconds`)
-    .first<{ created_at: string; expiration: string }>())!
+  const [{ created_at, expiration }] = await Promise.all([
+    (await env.DB.prepare(
+      `
+      insert into kv
+        (namespace, key, content_type, size, expiration)
+      values (?, ?, ?, ?, datetime('now', ?))
+      on conflict do update set
+        content_type = excluded.content_type,
+        size = excluded.size,
+        created_at = datetime('now'),
+        expiration = excluded.expiration
+      returning
+      ${sqlIsoDate('created_at')} as created_at,
+      ${sqlIsoDate('expiration')} as expiration`,
+    )
+      .bind(read_key, key, content_type, size, `+${ttl} seconds`)
+      .first<{ created_at: string; expiration: string }>())!,
+    env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(read_key).run(),
+    env.cloudkvData.put(dataKey(read_key, key), body, {
+      expirationTtl: ttl + 5,
+      metadata: { content_type } satisfies KVMetadata,
+    }),
+  ])
 
-  await env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(read_key).run()
-
-  const metadata: KVMetadata = { content_type }
-  const expirationDate = new Date(expiration)
-  await env.cloudkvData.put(dataKey(read_key, key), body, {
-    expiration: expirationDate.getTime() / 1000,
-    metadata,
-  })
   const url = new URL(request.url)
   url.search = ''
   url.hash = ''
