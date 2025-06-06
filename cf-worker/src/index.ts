@@ -311,7 +311,7 @@ function index(request: Request): Response {
   if (request.method === 'GET') {
     return new Response(
       `\
-<h1>Cloud KV</h1>
+<h1>cloudkv</h1>
 <p>See <a href="https://github.com/samuelcolvin/cloudkv">github.com/samuelcolvin/cloudkv</a> for details.</p>
 `,
       {

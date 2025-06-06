@@ -7,7 +7,7 @@
 
 key/value store based on Cloudflare workers.
 
-By default the `cloudkv` package connects to `https://cloudkv.samuelcolvin.workers.dev` but you can deploy an instance to your own worker if you prefer.
+By default the `cloudkv` package connects to [cloudkv.samuelcolvin.workers.dev](https://cloudkv.samuelcolvin.workers.dev) but you can deploy an instance to your own cloudflare worker if you prefer.
 
 Some reasons you might use cloudkv:
 * zero DB setup or account required, just create a namespace with the CLI and get started
