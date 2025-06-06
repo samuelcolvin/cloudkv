@@ -10,19 +10,35 @@ repos:
 
   - repo: local
     hooks:
-      - id: format
-        name: Format
+      - id: format-py
+        name: Format Python
         entry: make
-        args: [format]
+        args: [format-py]
         language: system
         types: [python]
         pass_filenames: false
-      - id: lint
-        name: Lint
+      - id: typecheck-py
+        name: Typecheck Python
         entry: make
-        args: [lint]
-        types: [python]
+        args: [typecheck-py]
         language: system
+        types: [python]
+        pass_filenames: false
+      - id: format-ts
+        name: Format TypeScript
+        entry: make
+        args: [format-ts]
+        language: system
+        types_or: [javascript, ts, json]
+        files: "^cf-worker/"
+        pass_filenames: false
+      - id: typecheck-ts
+        name: Typecheck TypeScript
+        entry: make
+        args: [typecheck-ts]
+        language: system
+        types_or: [javascript, ts, json]
+        files: "^cf-worker/"
         pass_filenames: false
 
   - repo: https://github.com/codespell-project/codespell

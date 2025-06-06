@@ -14,19 +14,52 @@ install: .uv .pre-commit ## Install the package, dependencies, and pre-commit fo
 	uv sync --frozen
 	pre-commit install --install-hooks
 
-.PHONY: format
-format: ## Format the code
+.PHONY: format-py
+format-py: ## Format Python code
 	uv run ruff format
 	uv run ruff check --fix --fix-only
 
-.PHONY: lint
-lint: ## Lint the code
+.PHONY: format-ts
+format-ts: ## Format TS and JS code
+		cd cf-worker && npm run format
+
+.PHONY: format
+format: format-py format-ts ## Format all code
+
+.PHONY: lint-py
+lint-py: ## Lint Python code
 	uv run ruff format --check
 	uv run ruff check
 
-.PHONY: test
-test: ## Run the tests
+.PHONY: lint-ts
+lint-ts: ## Lint TS and JS code
+	cd cf-worker && npm run lint
+
+.PHONY: lint
+lint: lint-py lint-ts ## Lint all code
+
+.PHONY: typecheck-py
+typecheck-py: ## Typecheck the code
+	@# PYRIGHT_PYTHON_IGNORE_WARNINGS avoids the overhead of making a request to github on every invocation
+	PYRIGHT_PYTHON_IGNORE_WARNINGS=1 uv run pyright
+
+.PHONY: typecheck-ts
+typecheck-ts: ## Typecheck TS and JS code
+	cd cf-worker && npm run typecheck
+
+.PHONY: typecheck
+typecheck: typecheck-py typecheck-ts ## Typecheck all code
+
+.PHONY: test-py
+test-py: ## Run Python tests
 	uv run coverage run -p -m pytest
+
+.PHONY: test-ts
+test-ts: ## Run TS and JS tests
+	cd cf-worker && CI=1 npm run test
+
+.PHONY: test
+test: test-py test-ts ## Run all tests
 
 .PHONY: test-all-python
 test-all-python: ## Run tests on Python 3.9 to 3.13
@@ -38,13 +71,8 @@ test-all-python: ## Run tests on Python 3.9 to 3.13
 	@uv run coverage combine
 	@uv run coverage report
 
-.PHONY: typecheck
-typecheck: ## Typecheck the code
-	@# PYRIGHT_PYTHON_IGNORE_WARNINGS avoids the overhead of making a request to github on every invocation
-	PYRIGHT_PYTHON_IGNORE_WARNINGS=1 uv run pyright
-
 .PHONY: all
-all: format typecheck test
+all: format typecheck test ## run format, typecheck and test
 
 .PHONY: help
 help: ## Show this help (usage: make help)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from cloudkv import SyncCloudKV, __version__, _shared
+from cloudkv import SyncCloudKV, __version__, shared
 
 
 def cli() -> int:
@@ -22,8 +22,8 @@ See https://github.com/samuelcolvin/cloudkv for more details.
         '-u',
         '--base-url',
         nargs='?',
-        help=f'CloudKV Base URL, defaults to {_shared.DEFAULT_BASE_URL}.',
-        default=_shared.DEFAULT_BASE_URL,
+        help=f'CloudKV Base URL, defaults to {shared.DEFAULT_BASE_URL}.',
+        default=shared.DEFAULT_BASE_URL,
     )
     parser.add_argument('--version', action='store_true', help='Show version and exit')
     args = parser.parse_args()
@@ -40,7 +40,7 @@ Namespace created successfully.
 cloudkv_read_key = {ns.read_key!r}
 cloudkv_write_key = {ns.write_key!r}\
 """)
-    if args.base_url != _shared.DEFAULT_BASE_URL:
+    if args.base_url != shared.DEFAULT_BASE_URL:
         print(f'cloudkv_base_url = {args.base_url!r}')
     return 0
 
