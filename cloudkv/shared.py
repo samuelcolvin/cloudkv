@@ -24,22 +24,22 @@ class CreateNamespaceDetails(pydantic.BaseModel):
     write_key: str
     """Write API key for the namespace"""
     created_at: datetime
-    """Creation time of the namespace"""
+    """Creation timestamp of the namespace"""
 
 
 class KeyInfo(pydantic.BaseModel):
     url: str
     """URL of the key/value"""
     key: str
-    """The key set"""
+    """The key"""
     content_type: str | None
-    """Content type of the value"""
+    """Content type set in the datastore"""
     size: int
-    """Size of the value"""
+    """Size of the value in bytes"""
     created_at: datetime
-    """Creation time of the key/value"""
+    """Creation timestamp of the key/value"""
     expiration: datetime
-    """Expiration time of the key/value"""
+    """Expiration timestamp of the key/value"""
 
 
 class KeysResponse(pydantic.BaseModel):

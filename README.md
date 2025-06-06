@@ -5,7 +5,7 @@
 [![versions](https://img.shields.io/pypi/pyversions/cloudkv.svg)](https://github.com/samuelcolvin/cloudkv)
 [![license](https://img.shields.io/github/license/samuelcolvin/cloudkv.svg)](https://github.com/samuelcolvin/cloudkv/blob/main/LICENSE)
 
-key/value store based on Cloudflare workers, usable as a Python package.
+key/value store based on Cloudflare workers, with a Python client.
 
 By default the `cloudkv` Python package connects to [cloudkv.samuelcolvin.workers.dev](https://cloudkv.samuelcolvin.workers.dev) but you can deploy an instance to your own cloudflare worker if you prefer. Code for the server is in [./cf-worker](https://github.com/samuelcolvin/cloudkv/tree/docs/cf-worker).
 
@@ -56,9 +56,38 @@ from cloudkv import SyncCloudKV
 cloudkv_read_key = '***'
 cloudkv_write_key = '******'
 kv = SyncCloudKV(cloudkv_read_key, cloudkv_write_key)
-kv.set('foo', 'bar')
+url = kv.set('foo', 'bar')
+print(url)
+#> https://cloudkv.samuelcolvin.workers.dev/***/foo
 print(kv.get('foo'))
-#> bar
+#> b'bar'
+print(kv.get_as('foo', str))
+#> 'bar'
+```
+
+Storing structured and retrieving data:
+
+```py
+from dataclasses import dataclass
+from cloudkv import SyncCloudKV
+
+cloudkv_read_key = '***'
+cloudkv_write_key = '******'
+
+@dataclass
+class Foo:
+    bar: float
+    spam: list[dict[str, tuple[int, bytes]]]
+
+kv = SyncCloudKV(cloudkv_read_key, cloudkv_write_key)
+foo = Foo(1.23, [{'spam': (1, b'eggs')}])
+url = kv.set('foo', foo)
+print(url)
+#> https://cloudkv.samuelcolvin.workers.dev/***/foo
+print(kv.get('foo'))
+#> b'{"bar":1.23,"spam":[{"spam":[1,"eggs"]}]}'
+print(kv.get_as('foo', Foo))
+#> Foo(bar=1.23, spam=[{'spam': (1, b'eggs')}])
 ```
 
 ### Async API
@@ -249,20 +278,20 @@ class CreateNamespaceDetails(pydantic.BaseModel):
     write_key: str
     """Write API key for the namespace"""
     created_at: datetime
-    """Creation time of the namespace"""
+    """Creation timestamp of the namespace"""
 
 
 class KeyInfo(pydantic.BaseModel):
     url: str
     """URL of the key/value"""
     key: str
-    """The key set"""
+    """The key"""
     content_type: str | None
-    """Content type of the value"""
+    """Content type set in the datastore"""
     size: int
-    """Size of the value"""
+    """Size of the value in bytes"""
     created_at: datetime
-    """Creation time of the key/value"""
+    """Creation timestamp of the key/value"""
     expiration: datetime
-    """Expiration time of the key/value"""
+    """Expiration timestamp of the key/value"""
 ```
