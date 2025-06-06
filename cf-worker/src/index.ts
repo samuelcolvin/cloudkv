@@ -307,13 +307,16 @@ returning ${sqlIsoDate('created_at')} as created_at
   }
 }
 
-function index(request: Request, github_sha: string): Response {
+function index(request: Request, githubSha: string): Response {
+  const releaseNote = githubSha.startsWith('[')
+    ? githubSha
+    : `<a href="https://github.com/samuelcolvin/cloudkv/commit/${githubSha}">${githubSha.substring(0, 7)}</a>`
   if (request.method === 'GET') {
     return new Response(
       `\
 <h1>cloudkv</h1>
 <p>See <a href="https://github.com/samuelcolvin/cloudkv">github.com/samuelcolvin/cloudkv</a> for details.</p>
-<p>release: <code>${github_sha}</code></p>
+<p>release: ${releaseNote}</p>
 `,
       {
         headers: ctHeader('text/html'),

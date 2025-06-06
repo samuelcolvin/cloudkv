@@ -71,7 +71,7 @@ jobs:
 
   deploy-worker:
     needs: [check]
-    # if: "success() && github.ref == 'refs/heads/main'"
+    if: "success() && github.ref == 'refs/heads/main'"
     runs-on: ubuntu-latest
     environment: cloudflare-workers-deploy
 
