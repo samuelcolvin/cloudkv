@@ -35,9 +35,9 @@ def decode_value(
     content_type: str | None,
     return_type: type[T],
     *,
-    default: D,
+    default: D | None,
     force_validate: bool,
-) -> T | D:
+) -> T | D | None:
     if data is None:
         return default
     if force_validate or content_type == PYDANTIC_CONTENT_TYPE:

@@ -95,7 +95,14 @@ class AsyncCloudKV:
         else:
             return response.content, response.headers.get('Content-Type')
 
-    async def get_as(self, key: str, return_type: type[T], *, default: D = None, force_validate: bool = False) -> T | D:
+    async def get_as(
+        self,
+        key: str,
+        return_type: type[T],
+        *,
+        default: D | None = None,
+        force_validate: bool = False,
+    ) -> T | D | None:
         """Get a value as the given type, or fallback to the `default` value if the value does not exist.
 
         Internally this method uses pydantic to parse the value as JSON if it has the correct content-type,
