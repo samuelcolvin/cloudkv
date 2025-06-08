@@ -20,7 +20,7 @@ def cached_type_adapter(return_type: type[T]) -> pydantic.TypeAdapter[T]:
         return ta
 
 
-def encode_value(value: T, value_type: type[T] | None) -> tuple[bytes, str | None]:
+def encode_value(value: typing.Any) -> tuple[bytes, str | None]:
     if isinstance(value, str):
         return value.encode('utf-8'), 'text/plain'
     elif isinstance(value, bytes):
@@ -28,8 +28,7 @@ def encode_value(value: T, value_type: type[T] | None) -> tuple[bytes, str | Non
     elif isinstance(value, bytearray):
         return bytes(value), None
     else:
-        if value_type is None:
-            value_type = type(value)
+        value_type: type[typing.Any] = type(value)
         return cached_type_adapter(value_type).dump_json(value), PYDANTIC_CONTENT_TYPE
 
 

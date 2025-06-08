@@ -55,8 +55,7 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv sync
-      - run: uv run pytest
+      - run: make test-py
 
   test-cf-worker:
     name: test cf worker

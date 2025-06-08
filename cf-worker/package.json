@@ -10,7 +10,8 @@
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "local-reset-db": "wrangler d1 execute cloudkv-limits --local --command='delete from namespaces'"
   },
   "prettier": {
     "singleQuote": true,
