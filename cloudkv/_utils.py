@@ -53,7 +53,11 @@ def decode_value(
 
 
 def keys_query_params(
-    starts_with: str | None, ends_with: str | None, contains: str | None, like: str | None, offset: int | None
+    starts_with: str | None,
+    ends_with: str | None,
+    contains: str | None,
+    like: str | None,
+    offset: int | None,
 ) -> dict[str, str]:
     if starts_with is not None:
         like = _escape_like_pattern(starts_with) + '%'
