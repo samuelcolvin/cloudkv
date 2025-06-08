@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import SQL from '../schema.sql?raw'
 
 interface CreateNamespace {
+  base_url: string
   read_key: string
   write_key: string
   created_at: string
@@ -71,7 +72,8 @@ ${SQL}
     })
     expect(response.status).toBe(200)
     const data = await response.json<CreateNamespace>()
-    expect(Object.keys(data)).toEqual(['read_key', 'write_key', 'created_at'])
+    expect(Object.keys(data)).toEqual(['base_url', 'read_key', 'write_key', 'created_at'])
+    expect(data.base_url).toEqual('https://example.com')
     expect(data.read_key.length).toBe(24)
     expect(data.write_key.length).toBe(48)
     expect(data.created_at).toMatch(iso8601Regex)

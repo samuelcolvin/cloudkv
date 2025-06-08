@@ -52,7 +52,13 @@ typecheck: typecheck-py typecheck-ts ## Typecheck all code
 
 .PHONY: test-py
 test-py: ## Run Python tests
-	uv run coverage run -p -m pytest
+	uv run coverage run -m pytest
+	uv run coverage report --fail-under=100
+
+.PHONY: testcov
+testcov: test-py ## Run python tests and generate a coverage report
+	@echo "building coverage html"
+	@uv run coverage html
 
 .PHONY: test-ts
 test-ts: ## Run TS and JS tests

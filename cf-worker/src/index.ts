@@ -305,6 +305,12 @@ where created_at > datetime('now', '-24 hours')
     return textResponse(`IP limit (${MAX_IP_24}) on namespace creation per 24 hours exceeded`, 429)
   }
 
+  const url = new URL(request.url)
+  url.pathname = ''
+  url.search = ''
+  url.hash = ''
+  const base_url = url.toString().slice(0, -1)
+
   while (true) {
     // 18 bytes always results in a string of length 24
     const read_key = random(18)
@@ -322,7 +328,7 @@ returning ${sqlIsoDate('created_at')} as created_at
     if (row) {
       const { created_at } = row
       logfire.info('Namespace created', { read_key, created_at, ip })
-      return jsonResponse({ read_key, write_key, created_at })
+      return jsonResponse({ base_url, read_key, write_key, created_at })
     }
   }
 }

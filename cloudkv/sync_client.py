@@ -36,6 +36,8 @@ class SyncCloudKV:
         """
         self.namespace_read_api_key = read_api_key
         self.namespace_write_api_key = write_api_key
+        while base_url.endswith('/'):
+            base_url = base_url[:-1]
         self.base_url = base_url
 
     @classmethod
@@ -112,11 +114,10 @@ class SyncCloudKV:
     def set(
         self,
         key: str,
-        value: T,
+        value: _typing.Any,
         *,
         content_type: str | None = None,
         expires: int | None = None,
-        value_type: type[T] | None = None,
     ) -> str:
         """Set a value in the namespace.
 
@@ -126,21 +127,19 @@ class SyncCloudKV:
             content_type: content type of the value, defaults depends on the value type
             expires: Time in seconds before the value expires, must be >60 seconds, defaults to `None` meaning the
                 key will expire after 10 seconds.
-            value_type: type of the value, if set this is used by pydantic to serialize the value
 
         Returns:
             URL of the set operation.
         """
-        return self.set_details(key, value, content_type=content_type, expires=expires, value_type=value_type).url
+        return self.set_details(key, value, content_type=content_type, expires=expires).url
 
     def set_details(
         self,
         key: str,
-        value: T,
+        value: _typing.Any,
         *,
         content_type: str | None = None,
         expires: int | None = None,
-        value_type: type[T] | None = None,
     ) -> _shared.KeyInfo:
         """Set a value in the namespace and return details.
 
@@ -150,7 +149,6 @@ class SyncCloudKV:
             content_type: content type of the value, defaults depends on the value type
             expires: Time in seconds before the value expires, must be >60 seconds, defaults to `None` meaning the
                 key will expire after 10 seconds.
-            value_type: type of the value, if set this is used by pydantic to serialize the value
 
         Returns:
             Details of the key value pair as `KeyInfo`.
@@ -158,7 +156,7 @@ class SyncCloudKV:
         if not self.namespace_write_api_key:
             raise RuntimeError("Namespace write key not provided, can't set")
 
-        binary_value, inferred_content_type = _utils.encode_value(value, value_type)
+        binary_value, inferred_content_type = _utils.encode_value(value)
         content_type = content_type or inferred_content_type
 
         headers: dict[str, str] = {'authorization': self.namespace_write_api_key}

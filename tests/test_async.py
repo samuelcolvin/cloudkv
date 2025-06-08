@@ -1,0 +1,57 @@
+import pytest
+from dirty_equals import HasLen, IsStr, IsStrictDict
+
+from cloudkv import AsyncCloudKV
+
+from .conftest import IsDatetime, IsNow
+
+pytestmark = pytest.mark.anyio
+
+
+async def test_create_namespace(server: str):
+    create_details = await AsyncCloudKV.create_namespace(base_url=server)
+    assert create_details.model_dump() == IsStrictDict(
+        base_url='http://localhost:8787',
+        read_key=IsStr() & HasLen(24),
+        write_key=IsStr() & HasLen(48),
+        created_at=IsNow(),
+    )
+
+
+async def test_get_set_keys(server: str):
+    create_details = await AsyncCloudKV.create_namespace(base_url=server)
+
+    async with create_details.async_client() as kv:
+        url = await kv.set('test_key', 'test_value')
+        assert url == f'{server}/{create_details.read_key}/test_key'
+        assert await kv.get('test_key') == b'test_value'
+
+        keys = await kv.keys()
+        assert [k.model_dump() for k in keys] == [
+            {
+                'url': f'{server}/{create_details.read_key}/test_key',
+                'key': 'test_key',
+                'content_type': 'text/plain',
+                'size': 10,
+                'created_at': IsNow(),
+                'expiration': IsDatetime(),
+            }
+        ]
+
+        await kv.set('list_of_ints', [1, 2, 3])
+        assert await kv.get_as('list_of_ints', list[int]) == [1, 2, 3]
+
+
+async def test_delete(server: str):
+    create_details = await AsyncCloudKV.create_namespace(base_url=server)
+
+    async with create_details.async_client() as kv:
+        await kv.set('test_key', 'test_value')
+        assert await kv.get('test_key') == b'test_value'
+        keys = await kv.keys()
+        assert [k.key for k in keys] == ['test_key']
+
+        await kv.delete('test_key')
+        assert await kv.get('test_key') is None
+        keys = await kv.keys()
+        assert [k.key for k in keys] == []

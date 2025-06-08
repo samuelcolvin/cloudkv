@@ -1,10 +1,14 @@
 from __future__ import annotations as _annotations
 
 import os
+import typing
 from datetime import datetime
 
 import httpx
 import pydantic
+
+if typing.TYPE_CHECKING:
+    from . import AsyncCloudKV, SyncCloudKV
 
 __all__ = (
     'DEFAULT_BASE_URL',
@@ -19,12 +23,24 @@ PYDANTIC_CONTENT_TYPE = 'application/json; pydantic'
 
 
 class CreateNamespaceDetails(pydantic.BaseModel):
+    base_url: str
+    """Base URL of the namespace"""
     read_key: str
     """Read API key for the namespace"""
     write_key: str
     """Write API key for the namespace"""
     created_at: datetime
     """Creation timestamp of the namespace"""
+
+    def sync_client(self) -> SyncCloudKV:
+        from .sync_client import SyncCloudKV
+
+        return SyncCloudKV(self.read_key, self.write_key, base_url=self.base_url)
+
+    def async_client(self) -> AsyncCloudKV:
+        from .async_client import AsyncCloudKV
+
+        return AsyncCloudKV(self.read_key, self.write_key, base_url=self.base_url)
 
 
 class KeyInfo(pydantic.BaseModel):

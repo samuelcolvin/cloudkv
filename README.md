@@ -273,6 +273,8 @@ Types shown above have the following structure:
 
 ```py
 class CreateNamespaceDetails(pydantic.BaseModel):
+    base_url: str
+    """Base URL of the namespace"""
     read_key: str
     """Read API key for the namespace"""
     write_key: str

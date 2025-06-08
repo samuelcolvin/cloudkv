@@ -55,8 +55,12 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv sync
-      - run: uv run pytest
+      - uses: actions/setup-node@v4
+
+      - run: npm i
+        working-directory: cf-worker
+
+      - run: make test-py
 
   test-cf-worker:
     name: test cf worker
