@@ -13,9 +13,9 @@ const MAX_NAMESPACE_SIZE = MAX_NAMESPACE_SIZE_MB * MB
 const MAX_VALUE_SIZE_MB = 25
 const MAX_VALUE_SIZE = MAX_VALUE_SIZE_MB * MB
 // minimum TTL for key is 1 minute, cloudflare limitation
-const MIN_TTL = 60
+const MIN_EXPIRES = 60
 // max TTL for key is 10 years
-const MAX_TTL = 60 * 60 * 24 * 365 * 10
+const MAX_EXPIRES = 60 * 60 * 24 * 365 * 10
 const MAX_KEY_SIZE = 2048
 
 const handler = {
@@ -94,16 +94,16 @@ async function set(
     return textResponse(`Key length must not exceed ${MAX_KEY_SIZE}`, 414)
   }
 
-  let ttl: number = MAX_TTL
-  const ttlHeader = request.headers.get('ttl')
-  if (ttlHeader) {
+  let expires: number = MAX_EXPIRES
+  const expiresHeader = request.headers.get('expires')
+  if (expiresHeader) {
     try {
-      ttl = parseInt(ttlHeader)
+      expires = parseInt(expiresHeader)
     } catch (error) {
-      return textResponse(`Invalid "TTL" header "${ttlHeader}": not a valid number`, 400)
+      return textResponse(`Invalid "Expires" header "${expiresHeader}": not a valid number`, 400)
     }
-    // clamp ttl to valid range
-    ttl = Math.max(MIN_TTL, Math.min(ttl, MAX_TTL))
+    // clamp expires to valid range
+    expires = Math.max(MIN_EXPIRES, Math.min(expires, MAX_EXPIRES))
   }
 
   const body = await request.arrayBuffer()
@@ -152,10 +152,10 @@ select
       ${sqlIsoDate('created_at')} as created_at,
       ${sqlIsoDate('expiration')} as expiration`,
     )
-      .bind(readToken, key, content_type, size, `+${ttl} seconds`)
+      .bind(readToken, key, content_type, size, `+${expires} seconds`)
       .first<{ created_at: string; expiration: string }>(),
     env.cloudkvData.put(dataKey(readToken, key), body, {
-      expirationTtl: ttl + 5,
+      expirationTtl: expires + 5,
       metadata: { content_type } satisfies KVMetadata,
     }),
   ])
@@ -368,7 +368,7 @@ const dataKey = (namespace: string, key: string) => `data:${namespace}:${key}`
 const ctHeader = (contentType: string) => ({ 'Content-Type': contentType })
 
 const textResponse = (message: string, status: number) =>
-  new Response(`${status}: ${message}`, { status, headers: ctHeader('text/plain') })
+  new Response(message, { status, headers: ctHeader('text/plain') })
 const jsonResponse = (data: any) =>
   new Response(JSON.stringify(data, null, 2) + '\n', { headers: ctHeader('application/json') })
 

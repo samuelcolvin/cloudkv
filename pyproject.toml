@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cloudkv"
-version = "0.2.0"
+version = "0.3.0"
 description = "Hosted key/value store based on Cloudflare workers and KV store."
 authors = [{ name = "Samuel Colvin", email = "s@muelcolvin.com" }]
 license = "MIT"
@@ -59,16 +59,7 @@ testpaths = "tests"
 xfail_strict = true
 
 [tool.coverage.run]
-# required to avoid warnings about files created by create_module fixture
-include = [
-    "pydantic_ai_slim/**/*.py",
-    "pydantic_evals/**/*.py",
-    "pydantic_graph/**/*.py",
-    # TODO(Marcelo): Add 100% coverage for A2A.
-    # "fasta2a/**/*.py",
-    "tests/**/*.py",
-]
-omit = ["tests/test_live.py", "tests/example_modules/*.py"]
+include = ["cloudkv/**/*.py", "tests/**/*.py"]
 branch = true
 
 [tool.coverage.report]
@@ -81,7 +72,7 @@ exclude_lines = [
     'raise NotImplementedError',
     'if TYPE_CHECKING:',
     'if typing.TYPE_CHECKING:',
-    '@overload',
+    '@.*overload',
     '@deprecated',
     '@typing.overload',
     '@abstractmethod',

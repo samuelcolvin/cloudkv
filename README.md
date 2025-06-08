@@ -198,11 +198,10 @@ class SyncCloudKV:
     def set(
         self,
         key: str,
-        value: T,
+        value: _typing.Any,
         *,
         content_type: str | None = None,
-        expires: int | None = None,
-        value_type: type[T] | None = None,
+        expires: int | timedelta | None = None,
     ) -> str:
         """Set a value in the namespace.
 
@@ -212,13 +211,20 @@ class SyncCloudKV:
             content_type: content type of the value, defaults depends on the value type
             expires: Time in seconds before the value expires, must be >60 seconds, defaults to `None` meaning the
                 key will expire after 10 seconds.
-            value_type: type of the value, if set this is used by pydantic to serialize the value
 
         Returns:
             URL of the set operation.
         """
+        return self.set_details(key, value, content_type=content_type, expires=expires).url
 
-    def set_details(self, key: str, value: T, *, content_type: str | None = None, expires: int | None = None, value_type: type[T] | None = None) -> KeyInfo:
+    def set_details(
+        self,
+        key: str,
+        value: _typing.Any,
+        *,
+        content_type: str | None = None,
+        expires: int | timedelta | None = None,
+    ) -> KeyInfo:
         """Set a value in the namespace and return details.
 
         Args:
@@ -227,7 +233,6 @@ class SyncCloudKV:
             content_type: content type of the value, defaults depends on the value type
             expires: Time in seconds before the value expires, must be >60 seconds, defaults to `None` meaning the
                 key will expire after 10 seconds.
-            value_type: type of the value, if set this is used by pydantic to serialize the value
 
         Returns:
             Details of the key value pair as `KeyInfo`.

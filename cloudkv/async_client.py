@@ -1,6 +1,7 @@
 from __future__ import annotations as _annotations
 
 import typing as _typing
+from datetime import timedelta
 
 import httpx as _httpx
 
@@ -119,7 +120,7 @@ class AsyncCloudKV:
         value: _typing.Any,
         *,
         content_type: str | None = None,
-        ttl: int | None = None,
+        expires: int | timedelta | None = None,
     ) -> str:
         """Set a value in the namespace.
 
@@ -133,7 +134,7 @@ class AsyncCloudKV:
         Returns:
             URL of the set operation.
         """
-        set_response = await self.set_details(key, value, content_type=content_type, ttl=ttl)
+        set_response = await self.set_details(key, value, content_type=content_type, expires=expires)
         return set_response.url
 
     async def set_details(
@@ -142,7 +143,7 @@ class AsyncCloudKV:
         value: _typing.Any,
         *,
         content_type: str | None = None,
-        ttl: int | None = None,
+        expires: int | timedelta | None = None,
     ) -> _shared.KeyInfo:
         """Set a value in the namespace and return details.
 
@@ -165,8 +166,8 @@ class AsyncCloudKV:
         headers: dict[str, str] = {'authorization': self.namespace_write_token}
         if content_type is not None:
             headers['Content-Type'] = content_type
-        if ttl is not None:
-            headers['TTL'] = str(ttl)
+        if expires is not None:
+            headers['Expires'] = str(expires if isinstance(expires, int) else int(expires.total_seconds()))
 
         response = await self.client.post(
             f'{self.base_url}/{self.namespace_read_token}/{key}', content=binary_value, headers=headers
