@@ -11,7 +11,7 @@ D = typing.TypeVar('D')
 ta_lookup: dict[str, pydantic.TypeAdapter[typing.Any]] = {}
 
 
-def cached_type_adapter(return_type: type[T]) -> pydantic.TypeAdapter[T]:
+def _cached_type_adapter(return_type: type[T]) -> pydantic.TypeAdapter[T]:
     key = return_type.__qualname__
     if ta := ta_lookup.get(key):
         return ta
@@ -27,7 +27,7 @@ def encode_value(value: object) -> tuple[bytes, str | None]:
     if isinstance(value, bytearray):
         return bytes(value), None
     value_type: type[object] = type(value)
-    return cached_type_adapter(value_type).dump_json(value), PYDANTIC_CONTENT_TYPE
+    return _cached_type_adapter(value_type).dump_json(value), PYDANTIC_CONTENT_TYPE
 
 
 def decode_value(
@@ -41,7 +41,7 @@ def decode_value(
     if data is None:
         return default
     if force_validate or content_type == PYDANTIC_CONTENT_TYPE:
-        return cached_type_adapter(return_type).validate_json(data)
+        return _cached_type_adapter(return_type).validate_json(data)
     if return_type is bytes:
         return typing.cast(T, data)
     if return_type is str:
