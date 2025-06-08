@@ -17,25 +17,25 @@ class SyncCloudKV:
     This client can be used either directly after initialization or as a context manager.
     """
 
-    namespace_read_api_key: str
+    namespace_read_token: str
     """Key used to get values and list keys."""
-    namespace_write_api_key: str | None
+    namespace_write_token: str | None
     """Key required to set and delete keys."""
     base_url: str
     """Base URL to connect to."""
     _client: _httpx.Client | None = None
 
-    def __init__(self, read_api_key: str, write_api_key: str | None, *, base_url: str = _shared.DEFAULT_BASE_URL):
+    def __init__(self, read_token: str, write_token: str | None, *, base_url: str = _shared.DEFAULT_BASE_URL):
         """Initialize a new sync client.
 
         Args:
-            read_api_key: Read API key for the namespace.
-            write_api_key: Write API key for the namespace, maybe unset if you only have permission to read values
+            read_token: Read API key for the namespace.
+            write_token: Write API key for the namespace, maybe unset if you only have permission to read values
                 and list keys.
             base_url: Base URL to connect to.
         """
-        self.namespace_read_api_key = read_api_key
-        self.namespace_write_api_key = write_api_key
+        self.namespace_read_token = read_token
+        self.namespace_write_token = write_token
         while base_url.endswith('/'):
             base_url = base_url[:-1]
         self.base_url = base_url
@@ -85,7 +85,7 @@ class SyncCloudKV:
             `content_type` will be `None` if the key doesn't exist, or no content-type is set on the key.
         """
         assert key, 'Key cannot be empty'
-        response = self.client.get(f'{self.base_url}/{self.namespace_read_api_key}/{key}')
+        response = self.client.get(f'{self.base_url}/{self.namespace_read_token}/{key}')
         _shared.ResponseError.check(response)
         if response.status_code == 244:
             return None, None
@@ -153,20 +153,20 @@ class SyncCloudKV:
         Returns:
             Details of the key value pair as `KeyInfo`.
         """
-        if not self.namespace_write_api_key:
+        if not self.namespace_write_token:
             raise RuntimeError("Namespace write key not provided, can't set")
 
         binary_value, inferred_content_type = _utils.encode_value(value)
         content_type = content_type or inferred_content_type
 
-        headers: dict[str, str] = {'authorization': self.namespace_write_api_key}
+        headers: dict[str, str] = {'authorization': self.namespace_write_token}
         if content_type is not None:
             headers['Content-Type'] = content_type
         if expires is not None:
             headers['TTL'] = str(expires)
 
         response = self.client.post(
-            f'{self.base_url}/{self.namespace_read_api_key}/{key}', content=binary_value, headers=headers
+            f'{self.base_url}/{self.namespace_read_token}/{key}', content=binary_value, headers=headers
         )
         _shared.ResponseError.check(response)
         return _shared.KeyInfo.model_validate_json(response.content)
@@ -180,10 +180,10 @@ class SyncCloudKV:
         Returns:
             True if the key was deleted, False otherwise.
         """
-        if not self.namespace_write_api_key:
+        if not self.namespace_write_token:
             raise RuntimeError("Namespace write key not provided, can't delete")
-        headers: dict[str, str] = {'authorization': self.namespace_write_api_key}
-        response = self.client.delete(f'{self.base_url}/{self.namespace_read_api_key}/{key}', headers=headers)
+        headers: dict[str, str] = {'authorization': self.namespace_write_token}
+        response = self.client.delete(f'{self.base_url}/{self.namespace_read_token}/{key}', headers=headers)
         _shared.ResponseError.check(response)
         return response.status_code == 200
 
@@ -224,7 +224,7 @@ class SyncCloudKV:
         """
         params = _utils.keys_query_params(starts_with, ends_with, contains, like, offset)
 
-        response = self.client.get(f'{self.base_url}/{self.namespace_read_api_key}', params=params)
+        response = self.client.get(f'{self.base_url}/{self.namespace_read_token}', params=params)
         _shared.ResponseError.check(response)
         return _shared.KeysResponse.model_validate_json(response.content).keys
 

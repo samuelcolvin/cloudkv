@@ -5,8 +5,8 @@ import SQL from '../schema.sql?raw'
 
 interface CreateNamespace {
   base_url: string
-  read_key: string
-  write_key: string
+  read_token: string
+  write_token: string
   created_at: string
 }
 
@@ -72,10 +72,10 @@ ${SQL}
     })
     expect(response.status).toBe(200)
     const data = await response.json<CreateNamespace>()
-    expect(Object.keys(data)).toEqual(['base_url', 'read_key', 'write_key', 'created_at'])
+    expect(Object.keys(data)).toEqual(['base_url', 'read_token', 'write_token', 'created_at'])
     expect(data.base_url).toEqual('https://example.com')
-    expect(data.read_key.length).toBe(24)
-    expect(data.write_key.length).toBe(48)
+    expect(data.read_token.length).toBe(24)
+    expect(data.write_token.length).toBe(48)
     expect(data.created_at).toMatch(iso8601Regex)
 
     const response2 = await SELF.fetch('https://example.com/create', {
@@ -84,8 +84,8 @@ ${SQL}
     })
     expect(response2.status).toBe(200)
     const data2 = await response2.json<CreateNamespace>()
-    expect(data2.read_key).not.toBe(data.read_key)
-    expect(data2.write_key).not.toBe(data.write_key)
+    expect(data2.read_token).not.toBe(data.read_token)
+    expect(data2.write_token).not.toBe(data.write_token)
   })
 
   it('set a KV, no content type', async () => {
@@ -93,16 +93,16 @@ ${SQL}
       method: 'POST',
       headers: { 'cf-connecting-ip': '::1' },
     })
-    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+    const { read_token, write_token } = await createResponse.json<CreateNamespace>()
 
-    const setResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const setResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
-      headers: { 'content-type': '', Authorization: write_key },
+      headers: { 'content-type': '', Authorization: write_token },
     })
     expect(setResponse.status).toBe(200)
     const setData = await setResponse.json<SetKV>()
-    expect(setData.url).toEqual(`https://example.com/${read_key}/foobar.json`)
+    expect(setData.url).toEqual(`https://example.com/${read_token}/foobar.json`)
     expect(setData.key).toMatchInlineSnapshot(`"foobar.json"`)
     expect(setData.content_type).toBeNull()
     expect(setData.size).toMatchInlineSnapshot(`7`)
@@ -122,16 +122,16 @@ ${SQL}
       method: 'POST',
       headers: { 'cf-connecting-ip': '::1' },
     })
-    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+    const { read_token, write_token } = await createResponse.json<CreateNamespace>()
 
-    const setResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const setResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
-      headers: { 'Content-Type': 'text/plain', Authorization: `Bearer ${write_key}` },
+      headers: { 'Content-Type': 'text/plain', Authorization: `Bearer ${write_token}` },
     })
     expect(setResponse.status).toBe(200)
     const setData = await setResponse.json<SetKV>()
-    expect(setData.url).toEqual(`https://example.com/${read_key}/foobar.json`)
+    expect(setData.url).toEqual(`https://example.com/${read_token}/foobar.json`)
     expect(setData.key).toMatchInlineSnapshot(`"foobar.json"`)
     expect(setData.content_type).toMatchInlineSnapshot(`"text/plain"`)
     expect(setData.size).toMatchInlineSnapshot(`7`)
@@ -157,9 +157,9 @@ ${SQL}
       method: 'POST',
       headers: { 'cf-connecting-ip': '::1' },
     })
-    const { read_key } = await createResponse.json<CreateNamespace>()
+    const { read_token } = await createResponse.json<CreateNamespace>()
 
-    const response = await SELF.fetch(`https://example.com/${read_key}/foobar.json`)
+    const response = await SELF.fetch(`https://example.com/${read_token}/foobar.json`)
     expect(response.status).toBe(244)
     expect(await response.text()).toEqual('244: Key does not exist')
   })
@@ -169,17 +169,17 @@ ${SQL}
       method: 'POST',
       headers: { 'cf-connecting-ip': '::1' },
     })
-    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+    const { read_token, write_token } = await createResponse.json<CreateNamespace>()
 
-    const setResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const setResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
-      headers: { 'Content-Type': 'text/plain', Authorization: write_key },
+      headers: { 'Content-Type': 'text/plain', Authorization: write_token },
     })
     expect(setResponse.status).toBe(200)
     const setData = await setResponse.json<SetKV>()
 
-    const listResponse = await SELF.fetch(`https://example.com/${read_key}/`)
+    const listResponse = await SELF.fetch(`https://example.com/${read_token}/`)
     expect(listResponse.status).toBe(200)
     const listData = await listResponse.json<ListResponse>()
     expect(listData.keys.length).toBe(1)
@@ -190,12 +190,12 @@ ${SQL}
     expect(listData.keys[0].expiration).toMatch(iso8601Regex)
     expect(listData.keys[0].url).toBe(setData.url)
 
-    const listLikeMatchResponse = await SELF.fetch(`https://example.com/${read_key}/?like=%foo%`)
+    const listLikeMatchResponse = await SELF.fetch(`https://example.com/${read_token}/?like=%foo%`)
     expect(listLikeMatchResponse.status).toBe(200)
     const listLikeMatchData = await listLikeMatchResponse.json<ListResponse>()
     expect(listLikeMatchData.keys.length).toBe(1)
 
-    const listLikeNoMatchResponse = await SELF.fetch(`https://example.com/${read_key}/?like=%xxx%`)
+    const listLikeNoMatchResponse = await SELF.fetch(`https://example.com/${read_token}/?like=%xxx%`)
     expect(listLikeNoMatchResponse.status).toBe(200)
     const listLikeNoMatchData = await listLikeNoMatchResponse.json<ListResponse>()
     expect(listLikeNoMatchData.keys.length).toBe(0)
@@ -226,9 +226,9 @@ ${SQL}
       method: 'POST',
       headers: { 'cf-connecting-ip': '::1' },
     })
-    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+    const { read_token, write_token } = await createResponse.json<CreateNamespace>()
 
-    const noAuthResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const noAuthResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
       headers: { 'Content-Type': 'text/plain' },
@@ -236,7 +236,7 @@ ${SQL}
     expect(noAuthResponse.status).toBe(401)
     expect(await noAuthResponse.text()).toEqual('401: Authorization header not provided')
 
-    const wrongAuthResponse1 = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const wrongAuthResponse1 = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
       headers: { 'Content-Type': 'text/plain', authorization: 'xxx' },
@@ -245,10 +245,10 @@ ${SQL}
     expect(await wrongAuthResponse1.text()).toEqual('403: Authorization header does not match write key')
 
     // write key length, but wrong case
-    const wrongAuthResponse2 = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const wrongAuthResponse2 = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
-      headers: { 'Content-Type': 'text/plain', authorization: write_key.toLowerCase() },
+      headers: { 'Content-Type': 'text/plain', authorization: write_token.toLowerCase() },
     })
     expect(wrongAuthResponse2.status).toBe(403)
     expect(await wrongAuthResponse2.text()).toEqual('403: Authorization header does not match write key')
@@ -259,12 +259,12 @@ ${SQL}
       method: 'POST',
       headers: { 'cf-connecting-ip': '::1' },
     })
-    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+    const { read_token, write_token } = await createResponse.json<CreateNamespace>()
 
-    const setResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const setResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
-      headers: { Authorization: write_key },
+      headers: { Authorization: write_token },
     })
     expect(setResponse.status).toBe(200)
     const setData = await setResponse.json<SetKV>()
@@ -273,9 +273,9 @@ ${SQL}
     expect(getResponse.status).toBe(200)
     expect(await getResponse.text()).toEqual('testing')
 
-    const deleteResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const deleteResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'DELETE',
-      headers: { Authorization: write_key },
+      headers: { Authorization: write_token },
     })
     expect(deleteResponse.status).toBe(200)
     expect(await deleteResponse.text()).toEqual('200: Key deleted')
@@ -284,9 +284,9 @@ ${SQL}
     expect(getResponse2.status).toBe(244)
     expect(await getResponse2.text()).toEqual('244: Key does not exist')
 
-    const deleteResponse2 = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const deleteResponse2 = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'DELETE',
-      headers: { Authorization: write_key },
+      headers: { Authorization: write_token },
     })
     expect(deleteResponse2.status).toBe(244)
     expect(await deleteResponse2.text()).toEqual('244: Key not found')
@@ -305,19 +305,19 @@ ${SQL}
       method: 'POST',
       headers: { 'cf-connecting-ip': '::1' },
     })
-    const { read_key, write_key } = await createResponse.json<CreateNamespace>()
+    const { read_token, write_token } = await createResponse.json<CreateNamespace>()
 
-    const setResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const setResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
       body: 'testing',
-      headers: { Authorization: write_key },
+      headers: { Authorization: write_token },
     })
     expect(setResponse.status).toBe(200)
     const setData = await setResponse.json<SetKV>()
 
-    const deleteResponse = await SELF.fetch(`https://example.com/${read_key}/foobar.json`, {
+    const deleteResponse = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'DELETE',
-      headers: { Authorization: write_key.toLowerCase() },
+      headers: { Authorization: write_token.toLowerCase() },
     })
     expect(deleteResponse.status).toBe(403)
     expect(await deleteResponse.text()).toEqual('403: Authorization header does not match write key')

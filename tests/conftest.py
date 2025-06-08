@@ -52,7 +52,10 @@ def server() -> Iterable[str]:
             raise RuntimeError(f'SQL reset command failed with exit code {p.returncode}:\n{p.stdout.decode()}')
 
     server_process = subprocess.Popen(
-        ['npm', 'run', 'dev'], cwd=cf_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        ['npm', 'run', 'dev'],
+        cwd=cf_dir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
     try:
         _check_connection(base_url)
