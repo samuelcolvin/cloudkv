@@ -110,7 +110,13 @@ class SyncCloudKV:
             The value as the given type, or the default value if the key does not exist.
         """
         data, content_type = self.get_content_type(key)
-        return _utils.decode_value(data, content_type, return_type, default, force_validate)
+        return _utils.decode_value(
+            data,
+            content_type,
+            return_type,
+            default,
+            force_validate=force_validate,
+        )
 
     def set(
         self,

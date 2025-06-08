@@ -31,7 +31,12 @@ def encode_value(value: typing.Any) -> tuple[bytes, str | None]:
 
 
 def decode_value(
-    data: bytes | None, content_type: str | None, return_type: type[T], default: D, force_validate: bool
+    data: bytes | None,
+    content_type: str | None,
+    return_type: type[T],
+    default: D,
+    *,
+    force_validate: bool,
 ) -> T | D:
     if data is None:
         return default
