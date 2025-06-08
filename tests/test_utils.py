@@ -94,7 +94,7 @@ def test_decode_value_kwargs_error(kwargs: dict[str, Any]):
         ({'contains': 'test'}, snapshot({'like': '%test%'})),
     ],
 )
-def test_tokens_query_params(kwargs: dict[str, Any], params: dict[str, str]):
+def test_keys_query_params(kwargs: dict[str, Any], params: dict[str, str]):
     kwargs.setdefault('starts_with', None)
     kwargs.setdefault('ends_with', None)
     kwargs.setdefault('contains', None)

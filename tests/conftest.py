@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 import time
@@ -32,39 +33,41 @@ def anyio_backend():
 @pytest.fixture(scope='session')
 def server() -> Iterable[str]:
     """Run the dev cf worker."""
+    if remove_url := os.getenv('TEST_AGAINST_REMOTE'):
+        yield remove_url
+    else:
+        base_url = 'http://localhost:8787'
+        cf_dir = Path(__file__).parent.parent / 'cf-worker'
+        schema_sql = (cf_dir / 'schema.sql').read_text()
+        schema_sql += '\ndelete from namespaces;'
 
-    base_url = 'http://localhost:8787'
-    cf_dir = Path(__file__).parent.parent / 'cf-worker'
-    schema_sql = (cf_dir / 'schema.sql').read_text()
-    schema_sql += '\ndelete from namespaces;'
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(schema_sql.encode())
+            f.flush()
+            # reset the local database for testing
+            p = subprocess.run(
+                ['npx', 'wrangler', 'd1', 'execute', 'cloudkv-limits', '--local', '--file', f.name],
+                cwd=cf_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+            if p.returncode != 0:  # pragma: no cover
+                raise RuntimeError(f'SQL reset command failed with exit code {p.returncode}:\n{p.stdout.decode()}')
 
-    with tempfile.NamedTemporaryFile() as f:
-        f.write(schema_sql.encode())
-        f.flush()
-        # reset the local database for testing
-        p = subprocess.run(
-            ['npx', 'wrangler', 'd1', 'execute', 'cloudkv-limits', '--local', '--file', f.name],
+        server_process = subprocess.Popen(
+            ['npm', 'run', 'dev'],
             cwd=cf_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        if p.returncode != 0:  # pragma: no cover
-            raise RuntimeError(f'SQL reset command failed with exit code {p.returncode}:\n{p.stdout.decode()}')
+        try:
+            _check_connection(base_url)
 
-    server_process = subprocess.Popen(
-        ['npm', 'run', 'dev'],
-        cwd=cf_dir,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    try:
-        _check_connection(base_url)
+            yield base_url
 
-        yield base_url
-
-    finally:
-        # Stop the development server
-        server_process.terminate()
+        finally:
+            # Stop the development server
+            server_process.terminate()
 
 
 def _check_connection(base_url: str):  # pragma: no cover
