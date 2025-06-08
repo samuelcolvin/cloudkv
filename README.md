@@ -40,8 +40,8 @@ Which should create a namespace and print the keys to use:
 creating namespace...
 Namespace created successfully.
 
-cloudkv_read_key = '***'
-cloudkv_write_key = '******'
+cloudkv_read_token = '***'
+cloudkv_write_token = '******'
 ```
 
 _(You can also create a namespace programmatically, see `create_namespace` below)_
@@ -53,9 +53,9 @@ With a namespace created, you can connect thus:
 ```py
 from cloudkv import SyncCloudKV
 
-cloudkv_read_key = '***'
-cloudkv_write_key = '******'
-kv = SyncCloudKV(cloudkv_read_key, cloudkv_write_key)
+cloudkv_read_token = '***'
+cloudkv_write_token = '******'
+kv = SyncCloudKV(cloudkv_read_token, cloudkv_write_token)
 url = kv.set('foo', 'bar')
 print(url)
 #> https://cloudkv.samuelcolvin.workers.dev/***/foo
@@ -71,15 +71,15 @@ Storing structured and retrieving data:
 from dataclasses import dataclass
 from cloudkv import SyncCloudKV
 
-cloudkv_read_key = '***'
-cloudkv_write_key = '******'
+cloudkv_read_token = '***'
+cloudkv_write_token = '******'
 
 @dataclass
 class Foo:
     bar: float
     spam: list[dict[str, tuple[int, bytes]]]
 
-kv = SyncCloudKV(cloudkv_read_key, cloudkv_write_key)
+kv = SyncCloudKV(cloudkv_read_token, cloudkv_write_token)
 foo = Foo(1.23, [{'spam': (1, b'eggs')}])
 url = kv.set('foo', foo)
 print(url)
@@ -101,11 +101,11 @@ while `SyncCloudKV` can optionally be used as a context manager or directly afte
 import asyncio
 from cloudkv import AsyncCloudKV
 
-cloudkv_read_key = '***'
-cloudkv_write_key = '******'
+cloudkv_read_token = '***'
+cloudkv_write_token = '******'
 
 async def main():
-    async with AsyncCloudKV.create(cloudkv_read_key, cloudkv_write_key) as kv:
+    async with AsyncCloudKV.create(cloudkv_read_token, cloudkv_write_token) as kv:
         await kv.set('foo', 'bar')
         print(await kv.get('foo'))
         #> bar
@@ -125,19 +125,19 @@ class SyncCloudKV:
 
     This client can be used either directly after initialization or as a context manager.
     """
-    namespace_read_api_key: str
+    namespace_read_token: str
     """Key used to get values and list keys."""
-    namespace_write_api_key: str | None
+    namespace_write_token: str | None
     """Key required to set and delete keys."""
     base_url: str
     """Base URL to connect to."""
 
-    def __init__(self, read_api_key: str, write_api_key: str | None, *, base_url: str = ...):
+    def __init__(self, read_token: str, write_token: str | None, *, base_url: str = ...):
         """Initialize a new sync client.
 
         Args:
-            read_api_key: Read API key for the namespace.
-            write_api_key: Write API key for the namespace, maybe unset if you only have permission to read values
+            read_token: Read API key for the namespace.
+            write_token: Write API key for the namespace, maybe unset if you only have permission to read values
                 and list keys.
             base_url: Base URL to connect to.
         """
@@ -275,9 +275,9 @@ Types shown above have the following structure:
 class CreateNamespaceDetails(pydantic.BaseModel):
     base_url: str
     """Base URL of the namespace"""
-    read_key: str
+    read_token: str
     """Read API key for the namespace"""
-    write_key: str
+    write_token: str
     """Write API key for the namespace"""
     created_at: datetime
     """Creation timestamp of the namespace"""

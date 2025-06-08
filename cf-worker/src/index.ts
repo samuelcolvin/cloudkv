@@ -28,15 +28,15 @@ const handler = {
       // 24 length matches the string resulting from random(18)
       const nsMatch = path.match(/^\/([a-zA-Z0-9]{24})\/?(.*)$/)
       if (nsMatch) {
-        const [_, read_key, key] = nsMatch
+        const [_, readToken, key] = nsMatch
         if (key === '') {
-          return await list(read_key, request, env)
+          return await list(readToken, request, env)
         } else if (request.method === 'GET' || request.method === 'HEAD') {
-          return await get(read_key, key, request, env)
+          return await get(readToken, key, request, env)
         } else if (request.method === 'POST') {
-          return await set(read_key, key, request, env, ctx)
+          return await set(readToken, key, request, env, ctx)
         } else if (request.method === 'DELETE') {
-          return await del(read_key, key, request, env)
+          return await del(readToken, key, request, env)
         } else {
           return response405('GET', 'HEAD', 'POST', 'DELETE')
         }
@@ -61,11 +61,11 @@ export default instrument(handler, {
   },
 })
 
-async function get(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
-  const { value, metadata } = await env.cloudkvData.getWithMetadata<KVMetadata>(dataKey(read_key, key), 'stream')
+async function get(readToken: string, key: string, request: Request, env: Env): Promise<Response> {
+  const { value, metadata } = await env.cloudkvData.getWithMetadata<KVMetadata>(dataKey(readToken, key), 'stream')
   if (!value || !metadata) {
     // only check the namespace if the key does not exist
-    const row = await env.DB.prepare('select 1 from namespaces where read_key=?').bind(read_key).first()
+    const row = await env.DB.prepare('select 1 from namespaces where read_token=?').bind(readToken).first()
     if (row) {
       return textResponse('Key does not exist', 244)
     } else {
@@ -78,7 +78,7 @@ async function get(read_key: string, key: string, request: Request, env: Env): P
 }
 
 async function set(
-  read_key: string,
+  readToken: string,
   key: string,
   request: Request,
   env: Env,
@@ -118,7 +118,7 @@ async function set(
   let { writeKey, nsSize } = (await env.DB.prepare(
     `
 select
-  (select write_key from namespaces where read_key = ?) as writeKey,
+  (select write_token from namespaces where read_token = ?) as writeKey,
   (
     select coalesce(sum(size), 0)
     from kv
@@ -126,7 +126,7 @@ select
   ) as nsSize;
 `,
   )
-    .bind(read_key, read_key, key)
+    .bind(readToken, readToken, key)
     .first<{ writeKey: string | null; nsSize: number }>())!
 
   if (!writeKey) {
@@ -152,16 +152,16 @@ select
       ${sqlIsoDate('created_at')} as created_at,
       ${sqlIsoDate('expiration')} as expiration`,
     )
-      .bind(read_key, key, content_type, size, `+${ttl} seconds`)
+      .bind(readToken, key, content_type, size, `+${ttl} seconds`)
       .first<{ created_at: string; expiration: string }>(),
-    env.cloudkvData.put(dataKey(read_key, key), body, {
+    env.cloudkvData.put(dataKey(readToken, key), body, {
       expirationTtl: ttl + 5,
       metadata: { content_type } satisfies KVMetadata,
     }),
   ])
   const { created_at, expiration } = row!
   ctx.waitUntil(
-    env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(read_key).run(),
+    env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(readToken).run(),
   )
 
   const url = new URL(request.url)
@@ -177,14 +177,14 @@ select
   })
 }
 
-async function del(read_key: string, key: string, request: Request, env: Env): Promise<Response> {
+async function del(readToken: string, key: string, request: Request, env: Env): Promise<Response> {
   const auth = getAuth(request)
   if (!auth) {
     return textResponse('Authorization header not provided', 401)
   }
 
-  let row = await env.DB.prepare(`select write_key as writeKey from namespaces where read_key = ?`)
-    .bind(read_key)
+  let row = await env.DB.prepare(`select write_token as writeKey from namespaces where read_token = ?`)
+    .bind(readToken)
     .first<{ writeKey: string }>()
 
   if (!row) {
@@ -195,9 +195,9 @@ async function del(read_key: string, key: string, request: Request, env: Env): P
     return textResponse('Authorization header does not match write key', 403)
   }
 
-  await env.cloudkvData.delete(dataKey(read_key, key))
+  await env.cloudkvData.delete(dataKey(readToken, key))
   const deleteRow = await env.DB.prepare('delete from kv where namespace=? and key=? returning size')
-    .bind(read_key, key)
+    .bind(readToken, key)
     .first()
 
   if (deleteRow) {
@@ -227,12 +227,12 @@ interface ListResponse {
   keys: ListKey[]
 }
 
-async function list(read_key: string, request: Request, env: Env): Promise<Response> {
+async function list(readToken: string, request: Request, env: Env): Promise<Response> {
   if (request.method !== 'GET') {
     return response405('GET')
   }
 
-  const nsExists = await env.DB.prepare('select 1 from namespaces where read_key=?').bind(read_key).first()
+  const nsExists = await env.DB.prepare('select 1 from namespaces where read_token=?').bind(readToken).first()
   if (!nsExists) {
     return textResponse('Namespace does not exist', 404)
   }
@@ -249,11 +249,11 @@ async function list(read_key: string, request: Request, env: Env): Promise<Respo
     }
   }
   // clean the URL to use when building the key URL
-  url.pathname = `/${read_key}`
+  url.pathname = `/${readToken}`
   url.search = ''
   url.hash = ''
 
-  const params = like ? [read_key, like, offset] : [read_key, offset]
+  const params = like ? [readToken, like, offset] : [readToken, offset]
   const result = await env.DB.prepare(
     `
 select
@@ -313,22 +313,22 @@ where created_at > datetime('now', '-24 hours')
 
   while (true) {
     // 18 bytes always results in a string of length 24
-    const read_key = random(18)
+    const read_token = random(18)
     // 36 bytes always results in a string of length 48
-    const write_key = random(36)
+    const write_token = random(36)
     const row = await env.DB.prepare(
       `
-insert into namespaces (read_key, write_key, ip) values (?, ?, ?)
+insert into namespaces (read_token, write_token, ip) values (?, ?, ?)
 on conflict do nothing
 returning ${sqlIsoDate('created_at')} as created_at
 `,
     )
-      .bind(read_key, write_key, ip)
+      .bind(read_token, write_token, ip)
       .first<{ created_at: string }>()
     if (row) {
       const { created_at } = row
-      logfire.info('Namespace created', { read_key, created_at, ip })
-      return jsonResponse({ base_url, read_key, write_key, created_at })
+      logfire.info('Namespace created', { read_token, created_at, ip })
+      return jsonResponse({ base_url, read_token, write_token, created_at })
     }
   }
 }

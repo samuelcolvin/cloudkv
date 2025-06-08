@@ -37,8 +37,8 @@ See https://github.com/samuelcolvin/cloudkv for more details.
     print(f"""\
 Namespace created successfully.
 
-cloudkv_read_key = {ns.read_key!r}
-cloudkv_write_key = {ns.write_key!r}\
+cloudkv_read_token = {ns.read_token!r}
+cloudkv_write_token = {ns.write_token!r}\
 """)
     if args.base_url != shared.DEFAULT_BASE_URL:
         print(f'cloudkv_base_url = {args.base_url!r}')

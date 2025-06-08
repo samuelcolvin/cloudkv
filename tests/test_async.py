@@ -12,25 +12,25 @@ async def test_create_namespace(server: str):
     create_details = await AsyncCloudKV.create_namespace(base_url=server)
     assert create_details.model_dump() == IsStrictDict(
         base_url='http://localhost:8787',
-        read_key=IsStr() & HasLen(24),
-        write_key=IsStr() & HasLen(48),
+        read_token=IsStr() & HasLen(24),
+        write_token=IsStr() & HasLen(48),
         created_at=IsNow(),
     )
 
 
-async def test_get_set_keys(server: str):
+async def test_get_set_tokens(server: str):
     create_details = await AsyncCloudKV.create_namespace(base_url=server)
 
     async with create_details.async_client() as kv:
-        url = await kv.set('test_key', 'test_value')
-        assert url == f'{server}/{create_details.read_key}/test_key'
-        assert await kv.get('test_key') == b'test_value'
+        url = await kv.set('test_token', 'test_value')
+        assert url == f'{server}/{create_details.read_token}/test_token'
+        assert await kv.get('test_token') == b'test_value'
 
         keys = await kv.keys()
         assert [k.model_dump() for k in keys] == [
             {
-                'url': f'{server}/{create_details.read_key}/test_key',
-                'key': 'test_key',
+                'url': f'{server}/{create_details.read_token}/test_token',
+                'key': 'test_token',
                 'content_type': 'text/plain',
                 'size': 10,
                 'created_at': IsNow(),
@@ -46,12 +46,25 @@ async def test_delete(server: str):
     create_details = await AsyncCloudKV.create_namespace(base_url=server)
 
     async with create_details.async_client() as kv:
-        await kv.set('test_key', 'test_value')
-        assert await kv.get('test_key') == b'test_value'
+        await kv.set('test_token', 'test_value')
+        assert await kv.get('test_token') == b'test_value'
         keys = await kv.keys()
-        assert [k.key for k in keys] == ['test_key']
+        assert [k.key for k in keys] == ['test_token']
 
-        await kv.delete('test_key')
-        assert await kv.get('test_key') is None
+        await kv.delete('test_token')
+        assert await kv.get('test_token') is None
         keys = await kv.keys()
         assert [k.key for k in keys] == []
+
+
+async def test_read_only(server: str):
+    create_details = await AsyncCloudKV.create_namespace(base_url=server)
+    async with create_details.async_client() as kv:
+        await kv.set('test_token', 'test_value')
+        assert await kv.get('test_token') == b'test_value'
+
+    async with AsyncCloudKV(create_details.read_token, None, base_url=server) as kv_readonly:
+        assert await kv_readonly.get('test_token') == b'test_value'
+
+        with pytest.raises(RuntimeError, match="Namespace write key not provided, can't set"):
+            await kv_readonly.set('test_token', 'test_value')

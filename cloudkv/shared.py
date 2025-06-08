@@ -25,9 +25,9 @@ PYDANTIC_CONTENT_TYPE = 'application/json; pydantic'
 class CreateNamespaceDetails(pydantic.BaseModel):
     base_url: str
     """Base URL of the namespace"""
-    read_key: str
+    read_token: str
     """Read API key for the namespace"""
-    write_key: str
+    write_token: str
     """Write API key for the namespace"""
     created_at: datetime
     """Creation timestamp of the namespace"""
@@ -35,12 +35,12 @@ class CreateNamespaceDetails(pydantic.BaseModel):
     def sync_client(self) -> SyncCloudKV:
         from .sync_client import SyncCloudKV
 
-        return SyncCloudKV(self.read_key, self.write_key, base_url=self.base_url)
+        return SyncCloudKV(self.read_token, self.write_token, base_url=self.base_url)
 
     def async_client(self) -> AsyncCloudKV:
         from .async_client import AsyncCloudKV
 
-        return AsyncCloudKV(self.read_key, self.write_key, base_url=self.base_url)
+        return AsyncCloudKV(self.read_token, self.write_token, base_url=self.base_url)
 
 
 class KeyInfo(pydantic.BaseModel):
