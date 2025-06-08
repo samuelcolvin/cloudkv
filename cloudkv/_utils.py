@@ -48,7 +48,8 @@ def decode_value(
         return typing.cast(T, data.decode())
     if return_type is bytearray:
         return typing.cast(T, bytearray(data))
-    raise RuntimeError(f'Content-Type was not {PYDANTIC_CONTENT_TYPE!r} and return_type was not a string type')
+    msg = f'Content-Type was not {PYDANTIC_CONTENT_TYPE!r} and return_type was not a string type'
+    raise RuntimeError(msg)
 
 
 def keys_query_params(
