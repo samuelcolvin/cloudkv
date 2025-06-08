@@ -15,21 +15,19 @@ def cached_type_adapter(return_type: type[T]) -> pydantic.TypeAdapter[T]:
     key = return_type.__qualname__
     if ta := ta_lookup.get(key):
         return ta
-    else:
-        ta_lookup[key] = ta = pydantic.TypeAdapter(return_type)
-        return ta
+    ta_lookup[key] = ta = pydantic.TypeAdapter(return_type)
+    return ta
 
 
 def encode_value(value: typing.Any) -> tuple[bytes, str | None]:
     if isinstance(value, str):
         return value.encode('utf-8'), 'text/plain'
-    elif isinstance(value, bytes):
+    if isinstance(value, bytes):
         return value, None
-    elif isinstance(value, bytearray):
+    if isinstance(value, bytearray):
         return bytes(value), None
-    else:
-        value_type: type[typing.Any] = type(value)
-        return cached_type_adapter(value_type).dump_json(value), PYDANTIC_CONTENT_TYPE
+    value_type: type[typing.Any] = type(value)
+    return cached_type_adapter(value_type).dump_json(value), PYDANTIC_CONTENT_TYPE
 
 
 def decode_value(
@@ -37,16 +35,15 @@ def decode_value(
 ) -> T | D:
     if data is None:
         return default
-    elif force_validate or content_type == PYDANTIC_CONTENT_TYPE:
+    if force_validate or content_type == PYDANTIC_CONTENT_TYPE:
         return cached_type_adapter(return_type).validate_json(data)
-    elif return_type is bytes:
+    if return_type is bytes:
         return typing.cast(T, data)
-    elif return_type is str:
+    if return_type is str:
         return typing.cast(T, data.decode())
-    elif return_type is bytearray:
+    if return_type is bytearray:
         return typing.cast(T, bytearray(data))
-    else:
-        raise RuntimeError(f'Content-Type was not {PYDANTIC_CONTENT_TYPE!r} and return_type was not a string type')
+    raise RuntimeError(f'Content-Type was not {PYDANTIC_CONTENT_TYPE!r} and return_type was not a string type')
 
 
 def keys_query_params(
