@@ -62,7 +62,7 @@ ${SQL}
   it('response 404', async () => {
     const response = await SELF.fetch('https://example.com/404')
     expect(response.status).toBe(404)
-    expect(await response.text()).toMatchInlineSnapshot(`"404: Path not found"`)
+    expect(await response.text()).toMatchInlineSnapshot(`"Path not found"`)
   })
 
   it('creates a KV namespace', async () => {
@@ -149,7 +149,7 @@ ${SQL}
   it('get no namespace', async () => {
     const response = await SELF.fetch(`https://example.com/${'1'.repeat(24)}/foobar.json`)
     expect(response.status).toBe(404)
-    expect(await response.text()).toEqual('404: Namespace does not exist')
+    expect(await response.text()).toEqual('Namespace does not exist')
   })
 
   it('get no key', async () => {
@@ -161,7 +161,7 @@ ${SQL}
 
     const response = await SELF.fetch(`https://example.com/${read_token}/foobar.json`)
     expect(response.status).toBe(244)
-    expect(await response.text()).toEqual('244: Key does not exist')
+    expect(await response.text()).toEqual('Key does not exist')
   })
 
   it('set a KV, list', async () => {
@@ -208,7 +208,7 @@ ${SQL}
       headers: { 'Content-Type': 'text/plain', authorization: 'xxx' },
     })
     expect(response.status).toBe(404)
-    expect(await response.text()).toEqual('404: Path not found')
+    expect(await response.text()).toEqual('Path not found')
   })
 
   it('returns 404 for unknown read key', async () => {
@@ -218,7 +218,7 @@ ${SQL}
       headers: { 'Content-Type': 'text/plain', authorization: 'xxx' },
     })
     expect(wrongReadKeyResponse.status).toBe(404)
-    expect(await wrongReadKeyResponse.text()).toEqual('404: Namespace does not exist')
+    expect(await wrongReadKeyResponse.text()).toEqual('Namespace does not exist')
   })
 
   it('returns 401 or 403 for bad write key', async () => {
@@ -234,7 +234,7 @@ ${SQL}
       headers: { 'Content-Type': 'text/plain' },
     })
     expect(noAuthResponse.status).toBe(401)
-    expect(await noAuthResponse.text()).toEqual('401: Authorization header not provided')
+    expect(await noAuthResponse.text()).toEqual('Authorization header not provided')
 
     const wrongAuthResponse1 = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'POST',
@@ -242,7 +242,7 @@ ${SQL}
       headers: { 'Content-Type': 'text/plain', authorization: 'xxx' },
     })
     expect(wrongAuthResponse1.status).toBe(403)
-    expect(await wrongAuthResponse1.text()).toEqual('403: Authorization header does not match write key')
+    expect(await wrongAuthResponse1.text()).toEqual('Authorization header does not match write key')
 
     // write key length, but wrong case
     const wrongAuthResponse2 = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
@@ -251,7 +251,7 @@ ${SQL}
       headers: { 'Content-Type': 'text/plain', authorization: write_token.toLowerCase() },
     })
     expect(wrongAuthResponse2.status).toBe(403)
-    expect(await wrongAuthResponse2.text()).toEqual('403: Authorization header does not match write key')
+    expect(await wrongAuthResponse2.text()).toEqual('Authorization header does not match write key')
   })
 
   it('set, gets, delete, get, delete', async () => {
@@ -278,18 +278,18 @@ ${SQL}
       headers: { Authorization: write_token },
     })
     expect(deleteResponse.status).toBe(200)
-    expect(await deleteResponse.text()).toEqual('200: Key deleted')
+    expect(await deleteResponse.text()).toEqual('Key deleted')
 
     const getResponse2 = await SELF.fetch(setData.url)
     expect(getResponse2.status).toBe(244)
-    expect(await getResponse2.text()).toEqual('244: Key does not exist')
+    expect(await getResponse2.text()).toEqual('Key does not exist')
 
     const deleteResponse2 = await SELF.fetch(`https://example.com/${read_token}/foobar.json`, {
       method: 'DELETE',
       headers: { Authorization: write_token },
     })
     expect(deleteResponse2.status).toBe(244)
-    expect(await deleteResponse2.text()).toEqual('244: Key not found')
+    expect(await deleteResponse2.text()).toEqual('Key not found')
   })
 
   it('delete no auth', async () => {
@@ -297,7 +297,7 @@ ${SQL}
       method: 'DELETE',
     })
     expect(deleteResponse.status).toBe(401)
-    expect(await deleteResponse.text()).toEqual('401: Authorization header not provided')
+    expect(await deleteResponse.text()).toEqual('Authorization header not provided')
   })
 
   it('delete wrong auth', async () => {
@@ -320,7 +320,7 @@ ${SQL}
       headers: { Authorization: write_token.toLowerCase() },
     })
     expect(deleteResponse.status).toBe(403)
-    expect(await deleteResponse.text()).toEqual('403: Authorization header does not match write key')
+    expect(await deleteResponse.text()).toEqual('Authorization header does not match write key')
 
     const getResponse = await SELF.fetch(setData.url)
     expect(getResponse.status).toBe(200)
@@ -333,6 +333,6 @@ ${SQL}
       headers: { Authorization: '1'.repeat(48) },
     })
     expect(deleteResponse.status).toBe(404)
-    expect(await deleteResponse.text()).toEqual('404: Namespace does not exist')
+    expect(await deleteResponse.text()).toEqual('Namespace does not exist')
   })
 })

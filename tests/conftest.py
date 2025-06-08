@@ -34,7 +34,7 @@ def anyio_backend():
 def server() -> Iterable[str]:
     """Run the dev cf worker."""
     if remove_url := os.getenv('TEST_AGAINST_REMOTE'):
-        yield remove_url
+        yield remove_url  # pragma: no cover
     else:
         base_url = 'http://localhost:8787'
         cf_dir = Path(__file__).parent.parent / 'cf-worker'

@@ -1,6 +1,7 @@
 from __future__ import annotations as _annotations
 
 import typing as _typing
+from datetime import timedelta
 
 import httpx as _httpx
 
@@ -117,7 +118,7 @@ class SyncCloudKV:
         value: _typing.Any,
         *,
         content_type: str | None = None,
-        expires: int | None = None,
+        expires: int | timedelta | None = None,
     ) -> str:
         """Set a value in the namespace.
 
@@ -139,7 +140,7 @@ class SyncCloudKV:
         value: _typing.Any,
         *,
         content_type: str | None = None,
-        expires: int | None = None,
+        expires: int | timedelta | None = None,
     ) -> _shared.KeyInfo:
         """Set a value in the namespace and return details.
 
@@ -162,8 +163,9 @@ class SyncCloudKV:
         headers: dict[str, str] = {'authorization': self.namespace_write_token}
         if content_type is not None:
             headers['Content-Type'] = content_type
+
         if expires is not None:
-            headers['TTL'] = str(expires)
+            headers['Expires'] = str(expires if isinstance(expires, int) else int(expires.total_seconds()))
 
         response = self.client.post(
             f'{self.base_url}/{self.namespace_read_token}/{key}', content=binary_value, headers=headers

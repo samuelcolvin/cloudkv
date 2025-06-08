@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pytest
 from dirty_equals import HasLen, IsStr, IsStrictDict
 
@@ -6,6 +8,17 @@ from cloudkv import AsyncCloudKV
 from .conftest import IsDatetime, IsNow
 
 pytestmark = pytest.mark.anyio
+
+
+def test_init():
+    kv = AsyncCloudKV('read', 'write', base_url='https://example.com/')
+    assert kv.namespace_read_token == 'read'
+    assert kv.namespace_write_token == 'write'
+    assert kv.base_url == 'https://example.com'
+
+    msg = 'HTTP client not initialized - AsyncCloudKV must be used as an async context manager'
+    with pytest.raises(RuntimeError, match=msg):
+        kv.client
 
 
 async def test_create_namespace(server: str):
@@ -46,10 +59,11 @@ async def test_delete(server: str):
     create_details = await AsyncCloudKV.create_namespace(base_url=server)
 
     async with create_details.async_client() as kv:
-        await kv.set('test_key', 'test_value')
+        await kv.set('test_key', b'test_value')
         assert await kv.get('test_key') == b'test_value'
         keys = await kv.keys()
         assert [k.key for k in keys] == ['test_key']
+        assert [k.content_type for k in keys] == [None]
 
         await kv.delete('test_key')
         assert await kv.get('test_key') is None
@@ -68,3 +82,25 @@ async def test_read_only(server: str):
 
         with pytest.raises(RuntimeError, match="Namespace write key not provided, can't set"):
             await kv_readonly.set('test_key', 'test_value')
+
+        with pytest.raises(RuntimeError, match="Namespace write key not provided, can't delete"):
+            await kv_readonly.delete('test_key')
+
+
+async def test_expires(server: str):
+    create_details = await AsyncCloudKV.create_namespace(base_url=server)
+
+    async with create_details.async_client() as kv:
+        await kv.set('test_key', 'test_value', expires=123)
+
+        keys = await kv.keys()
+        assert len(keys) == 1
+        key = keys[0]
+        assert (key.expiration - key.created_at).total_seconds() == 123
+
+        await kv.set('test_key2', 'test_value', expires=timedelta(seconds=42))
+
+        keys = await kv.keys(like='test_key2')
+        assert len(keys) == 1
+        key = keys[0]
+        assert (key.expiration - key.created_at).total_seconds() == 60

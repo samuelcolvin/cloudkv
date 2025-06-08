@@ -1,7 +1,9 @@
+from datetime import timedelta
+
 import pytest
 from dirty_equals import HasLen, IsList, IsStr
 
-from cloudkv import SyncCloudKV
+from cloudkv import SyncCloudKV, shared
 
 from .conftest import IsDatetime, IsNow
 
@@ -9,9 +11,10 @@ pytestmark = pytest.mark.anyio
 
 
 def test_init():
-    kv = SyncCloudKV('read', 'write')
+    kv = SyncCloudKV('read', 'write', base_url='https://example.com/')
     assert kv.namespace_read_token == 'read'
     assert kv.namespace_write_token == 'write'
+    assert kv.base_url == 'https://example.com'
 
 
 def test_create_namespace(server: str):
@@ -62,10 +65,12 @@ def test_keys(server: str):
 def test_delete(server: str):
     kv = SyncCloudKV.create_namespace(base_url=server).sync_client()
 
-    kv.set('test_key', 'test_value')
+    kv.set('test_key', b'test_value')
     assert kv.get('test_key') == b'test_value'
 
-    assert [k.key for k in kv.keys()] == ['test_key']
+    keys = kv.keys()
+    assert [k.key for k in keys] == ['test_key']
+    assert [k.content_type for k in keys] == [None]
 
     kv.delete('test_key')
 
@@ -84,3 +89,31 @@ def test_read_only(server: str):
 
     with pytest.raises(RuntimeError, match="Namespace write key not provided, can't set"):
         kv_readonly.set('test_key', 'test_value')
+
+    with pytest.raises(RuntimeError, match="Namespace write key not provided, can't delete"):
+        kv_readonly.delete('test_key')
+
+
+def test_expires(server: str):
+    kv = SyncCloudKV.create_namespace(base_url=server).sync_client()
+    kv.set('test_key', 'test_value', expires=123)
+
+    keys = kv.keys()
+    assert len(keys) == 1
+
+    key = keys[0]
+    assert (key.expiration - key.created_at).total_seconds() == 123
+
+    kv.set('test_key2', 'test_value', expires=timedelta(seconds=42))
+
+    keys = kv.keys(like='test_key2')
+    assert len(keys) == 1
+    key = keys[0]
+    assert (key.expiration - key.created_at).total_seconds() == 60
+
+
+def test_invalid_tokens(server: str):
+    kv = SyncCloudKV('0' * 24, 'bar', base_url=server)
+
+    with pytest.raises(shared.ResponseError, match='Unexpected 404 response: Namespace does not exist'):
+        kv.set('test_key', 'test_value')

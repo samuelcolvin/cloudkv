@@ -56,7 +56,8 @@ test-py: ## Run Python tests
 	uv run coverage report --fail-under=100
 
 .PHONY: testcov
-testcov: test-py ## Run python tests and generate a coverage report
+testcov: ## Run python tests and generate a coverage report
+	uv run coverage run -m pytest
 	@echo "building coverage html"
 	@uv run coverage html
 
