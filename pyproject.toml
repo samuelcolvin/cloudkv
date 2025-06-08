@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cloudkv"
-version = "0.1.0"
+version = "0.2.0"
 description = "Hosted key/value store based on Cloudflare workers and KV store."
 authors = [{ name = "Samuel Colvin", email = "s@muelcolvin.com" }]
 license = "MIT"
