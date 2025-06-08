@@ -1,4 +1,5 @@
 import subprocess
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,11 +35,21 @@ def server() -> Iterable[str]:
 
     base_url = 'http://localhost:8787'
     cf_dir = Path(__file__).parent.parent / 'cf-worker'
+    schema_sql = (cf_dir / 'schema.sql').read_text()
+    schema_sql += '\ndelete from namespaces;'
 
-    # reset the local database for testing
-    subprocess.run(
-        ['npm', 'run', 'local-reset-db'], cwd=cf_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True
-    )
+    with tempfile.NamedTemporaryFile() as f:
+        f.write(schema_sql.encode())
+        f.flush()
+        # reset the local database for testing
+        p = subprocess.run(
+            ['npx', 'wrangler', 'd1', 'execute', 'cloudkv-limits', '--local', '--file', f.name],
+            cwd=cf_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        if p.returncode != 0:  # pragma: no cover
+            raise RuntimeError(f'SQL reset command failed with exit code {p.returncode}:\n{p.stdout.decode()}')
 
     server_process = subprocess.Popen(
         ['npm', 'run', 'dev'], cwd=cf_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
