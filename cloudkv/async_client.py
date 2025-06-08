@@ -116,7 +116,7 @@ class AsyncCloudKV:
             data,
             content_type,
             return_type,
-            default,
+            default=default,
             force_validate=force_validate,
         )
 

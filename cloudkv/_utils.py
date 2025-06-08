@@ -34,8 +34,8 @@ def decode_value(
     data: bytes | None,
     content_type: str | None,
     return_type: type[T],
-    default: D,
     *,
+    default: D,
     force_validate: bool,
 ) -> T | D:
     if data is None:
