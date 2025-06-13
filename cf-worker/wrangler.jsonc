@@ -12,6 +12,7 @@
   ],
   "vars": {
     "GITHUB_SHA": "[unknown]",
+    // if you set `LOGFIRE_TOKEN=pylf...` in .dev.vars, also set `LOGFIRE_ENVIRONMENT=dev`
     "LOGFIRE_ENVIRONMENT": "prod",
   },
   "d1_databases": [
