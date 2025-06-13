@@ -6,9 +6,6 @@ const MB = 1024 * 1024
 const MAX_GLOBAL_24 = 1000
 // maximum number of namespaces that can be created in 24 hours, per IP
 const MAX_IP_24 = 20
-// maximum size of a namespace
-const MAX_NAMESPACE_SIZE_MB = 200
-const MAX_NAMESPACE_SIZE = MAX_NAMESPACE_SIZE_MB * MB
 // maximum size of a value in bytes, this is a limitation of cloudflare KV
 const MAX_VALUE_SIZE_MB = 25
 const MAX_VALUE_SIZE = MAX_VALUE_SIZE_MB * MB
@@ -145,7 +142,7 @@ ${sqlIsoDate('expiration')} as expiration`,
       auth,
       readToken,
       key,
-      MAX_NAMESPACE_SIZE - size,
+      env.NAMESPACE_SIZE_LIMIT - size,
     )
     .first<{ created_at: string; expiration: string }>()
 
@@ -159,7 +156,10 @@ ${sqlIsoDate('expiration')} as expiration`,
     } else if (auth != writeTokenRow.write_token) {
       return textResponse('Authorization header does not match write key', 403)
     } else {
-      return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 413)
+      return textResponse(
+        `Namespace size limit of ${Math.round(env.NAMESPACE_SIZE_LIMIT / MB)}MB would be exceeded`,
+        413,
+      )
     }
   }
 

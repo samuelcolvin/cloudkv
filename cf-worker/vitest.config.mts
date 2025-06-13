@@ -13,7 +13,14 @@ export default defineWorkersConfig({
     },
     poolOptions: {
       workers: {
-        wrangler: { configPath: './wrangler.jsonc' },
+        wrangler: {
+          configPath: './wrangler.jsonc',
+        },
+        miniflare: {
+          bindings: {
+            NAMESPACE_SIZE_LIMIT: 10,
+          },
+        },
       },
     },
   },
