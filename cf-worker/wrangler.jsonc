@@ -12,6 +12,7 @@
   ],
   "vars": {
     "GITHUB_SHA": "[unknown]",
+    "LOGFIRE_ENVIRONMENT": "prod",
   },
   "d1_databases": [
     {
