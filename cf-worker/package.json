@@ -10,7 +10,7 @@
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest",
-    "cf-typegen": "wrangler types"
+    "typegen": "wrangler types --strict-vars=false && prettier worker-configuration.d.ts --write"
   },
   "prettier": {
     "singleQuote": true,

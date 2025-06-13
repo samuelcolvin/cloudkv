@@ -6,9 +6,6 @@ const MB = 1024 * 1024
 const MAX_GLOBAL_24 = 1000
 // maximum number of namespaces that can be created in 24 hours, per IP
 const MAX_IP_24 = 20
-// maximum size of a namespace
-const MAX_NAMESPACE_SIZE_MB = 200
-const MAX_NAMESPACE_SIZE = MAX_NAMESPACE_SIZE_MB * MB
 // maximum size of a value in bytes, this is a limitation of cloudflare KV
 const MAX_VALUE_SIZE_MB = 25
 const MAX_VALUE_SIZE = MAX_VALUE_SIZE_MB * MB
@@ -36,7 +33,7 @@ const handler = {
         } else if (request.method === 'POST') {
           return await set(readToken, key, request, env, ctx)
         } else if (request.method === 'DELETE') {
-          return await del(readToken, key, request, env)
+          return await del(readToken, key, request, env, ctx)
         } else {
           return response405('GET', 'HEAD', 'POST', 'DELETE')
         }
@@ -114,51 +111,64 @@ async function set(
     return textResponse(`Value size must not exceed ${MAX_VALUE_SIZE_MB}MB`, 413)
   }
 
-  let { writeKey, nsSize } = (await env.DB.prepare(
+  const row = await env.DB.prepare(
     `
-select
-  (select write_token from namespaces where read_token = ?) as writeKey,
-  (
+insert into kv
+  (namespace, key, content_type, size, expiration)
+select ?, ?, ?, ?, datetime('now', ?)
+where
+  (select write_token from namespaces where read_token = ?) = ?
+  and (
     select coalesce(sum(size), 0)
     from kv
     where namespace = ? and key != ? and expiration > datetime('now')
-  ) as nsSize;
-`,
+  ) <= ?
+on conflict do update set
+  content_type = excluded.content_type,
+  size = excluded.size,
+  created_at = datetime('now'),
+  expiration = excluded.expiration
+returning
+${sqlIsoDate('created_at')} as created_at,
+${sqlIsoDate('expiration')} as expiration`,
   )
-    .bind(readToken, readToken, key)
-    .first<{ writeKey: string | null; nsSize: number }>())!
+    .bind(
+      readToken,
+      key,
+      content_type,
+      size,
+      `+${expires} seconds`,
+      readToken,
+      auth,
+      readToken,
+      key,
+      env.NAMESPACE_SIZE_LIMIT - size,
+    )
+    .first<{ created_at: string; expiration: string }>()
 
-  if (!writeKey) {
-    return textResponse('Namespace does not exist', 404)
-  } else if (!compareSecrets(auth, writeKey)) {
-    return textResponse('Authorization header does not match write key', 403)
-  } else if (nsSize + size > MAX_NAMESPACE_SIZE) {
-    return textResponse(`Namespace size limit of ${MAX_NAMESPACE_SIZE_MB}MB would be exceeded`, 413)
+  if (!row) {
+    const writeTokenRow = await env.DB.prepare('select write_token from namespaces where read_token = ?')
+      .bind(readToken)
+      .first<{ write_token: string }>()
+
+    if (!writeTokenRow) {
+      return textResponse('Namespace does not exist', 404)
+    } else if (auth != writeTokenRow.write_token) {
+      return textResponse('Authorization header does not match write key', 403)
+    } else {
+      return textResponse(
+        `Namespace size limit of ${Math.round(env.NAMESPACE_SIZE_LIMIT / MB)}MB would be exceeded`,
+        413,
+      )
+    }
   }
 
-  const [row] = await Promise.all([
-    env.DB.prepare(
-      `
-      insert into kv
-        (namespace, key, content_type, size, expiration)
-      values (?, ?, ?, ?, datetime('now', ?))
-      on conflict do update set
-        content_type = excluded.content_type,
-        size = excluded.size,
-        created_at = datetime('now'),
-        expiration = excluded.expiration
-      returning
-      ${sqlIsoDate('created_at')} as created_at,
-      ${sqlIsoDate('expiration')} as expiration`,
-    )
-      .bind(readToken, key, content_type, size, `+${expires} seconds`)
-      .first<{ created_at: string; expiration: string }>(),
-    env.cloudkvData.put(dataKey(readToken, key), body, {
-      expirationTtl: expires + 5,
-      metadata: { content_type } satisfies KVMetadata,
-    }),
-  ])
-  const { created_at, expiration } = row!
+  const { created_at, expiration } = row
+  const expirationDate = new Date(expiration)
+  await env.cloudkvData.put(dataKey(readToken, key), body, {
+    expirationTtl: expirationDate.getTime() / 1000,
+    metadata: { content_type } satisfies KVMetadata,
+  })
   ctx.waitUntil(
     env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(readToken).run(),
   )
@@ -176,7 +186,13 @@ select
   })
 }
 
-async function del(readToken: string, key: string, request: Request, env: Env): Promise<Response> {
+async function del(
+  readToken: string,
+  key: string,
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
   const auth = getAuth(request)
   if (!auth) {
     return textResponse('Authorization header not provided', 401)
@@ -190,7 +206,7 @@ async function del(readToken: string, key: string, request: Request, env: Env): 
     return textResponse('Namespace does not exist', 404)
   }
   const { writeKey } = row
-  if (!compareSecrets(auth, writeKey)) {
+  if (auth != writeKey) {
     return textResponse('Authorization header does not match write key', 403)
   }
 
@@ -198,6 +214,10 @@ async function del(readToken: string, key: string, request: Request, env: Env): 
   const deleteRow = await env.DB.prepare('delete from kv where namespace=? and key=? returning size')
     .bind(readToken, key)
     .first()
+
+  ctx.waitUntil(
+    env.DB.prepare("delete from kv where namespace = ? and expiration < datetime('now')").bind(readToken).run(),
+  )
 
   if (deleteRow) {
     return textResponse('Key deleted', 200)
@@ -398,20 +418,4 @@ function random(bytes: number): string {
   // Encode to base64, and replace `/` with 'a' and `+` with 'b' and `=` with 'c'
   // (this reduces entropy very slightly but makes the secret alpha numeric and easier to use)
   return btoa(binaryString).replaceAll('/', 'a').replaceAll('+', 'b').replaceAll('=', 'c')
-}
-
-/// Compare two strings in a constant time manner.
-// How much this matters in this case isn't clear, but may as well do it this way.
-function compareSecrets(s1: string, s2: string) {
-  if (s1.length !== s2.length) {
-    return false
-  } else {
-    let isEqual = true
-    for (let i = 0; i < s1.length; i++) {
-      if (s1.charCodeAt(i) !== s2.charCodeAt(i)) {
-        isEqual = false
-      }
-    }
-    return isEqual
-  }
 }

@@ -335,4 +335,40 @@ ${SQL}
     expect(deleteResponse.status).toBe(404)
     expect(await deleteResponse.text()).toEqual('Namespace does not exist')
   })
+
+  it('set key exceed namespace limit', async () => {
+    const createResponse = await SELF.fetch('https://example.com/create/', {
+      method: 'POST',
+      headers: { 'cf-connecting-ip': '::1' },
+    })
+    const { read_token, write_token } = await createResponse.json<CreateNamespace>()
+
+    const setResponse1 = await SELF.fetch(`https://example.com/${read_token}/foobar`, {
+      method: 'POST',
+      body: '12345',
+      headers: { Authorization: write_token },
+    })
+    expect(setResponse1.status).toBe(200)
+    const setData1 = await setResponse1.json<SetKV>()
+
+    const getResponse = await SELF.fetch(setData1.url)
+    expect(getResponse.status).toBe(200)
+    const text = await getResponse.text()
+    expect(text).toEqual('12345')
+
+    const setResponse2 = await SELF.fetch(`https://example.com/${read_token}/foobar`, {
+      method: 'POST',
+      body: '123456',
+      headers: { Authorization: write_token },
+    })
+    expect(setResponse2.status).toBe(200)
+
+    const setResponse3 = await SELF.fetch(`https://example.com/${read_token}/bar`, {
+      method: 'POST',
+      body: '12345',
+      headers: { Authorization: write_token },
+    })
+    expect(setResponse3.status).toBe(413)
+    expect(await setResponse3.text()).toEqual('Namespace size limit of 0MB would be exceeded')
+  })
 })
