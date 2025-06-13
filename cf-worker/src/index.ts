@@ -48,8 +48,7 @@ const handler = {
         return textResponse('Path not found', 404)
       }
     } catch (error) {
-      console.error(error)
-      logfire.error('Internal Server Error', { error: (error as any).toString() })
+      logfire.reportError('Internal Server Error', error as Error)
       return textResponse('Internal Server Error', 500)
     }
   },
